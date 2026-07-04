@@ -1,0 +1,584 @@
+from __future__ import annotations
+
+import argparse
+import base64
+import re
+import sys
+from dataclasses import dataclass
+from io import BytesIO
+from pathlib import Path
+from urllib.error import URLError
+from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
+
+import markdown as markdown_lib
+from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Pt, RGBColor
+from lxml import html as lxml_html
+
+
+BODY_FONT = "Calibri"
+CODE_FONT = "Consolas"
+TITLE_COLOR = RGBColor(31, 78, 121)
+LINK_COLOR = RGBColor(0, 102, 204)
+QUOTE_FILL = "F8F9FA"
+TABLE_HEAD_FILL = "D9EAF7"
+CODE_FILL = "F6F8FA"
+HR_COLOR = RGBColor(180, 190, 205)
+
+HEADING_TAGS = {f"h{i}" for i in range(1, 7)}
+BLOCK_TAGS = {
+    "article",
+    "aside",
+    "blockquote",
+    "div",
+    "figure",
+    "figcaption",
+    "li",
+    "nav",
+    "ol",
+    "p",
+    "pre",
+    "section",
+    "table",
+    "tbody",
+    "thead",
+    "tfoot",
+    "tr",
+    "ul",
+}
+TOC_PATTERN = re.compile(r"(?im)^(?:\[toc\]|\[\[toc\]\]|<!--\s*toc\s*-->)\s*$")
+
+
+@dataclass(frozen=True)
+class InlineStyle:
+    bold: bool = False
+    italic: bool = False
+    code: bool = False
+    strike: bool = False
+    underline: bool = False
+    color: RGBColor | None = None
+
+
+def slugify(text: str) -> str:
+    value = re.sub(r"[^0-9a-zA-Z]+", "_", text.strip().lower())
+    value = re.sub(r"_+", "_", value).strip("_")
+    return value or "section"
+
+
+def unique_name(base: str, used: set[str]) -> str:
+    candidate = base
+    index = 2
+    while candidate in used:
+        candidate = f"{base}_{index}"
+        index += 1
+    used.add(candidate)
+    return candidate
+
+
+def color_to_hex(color: RGBColor) -> str:
+    return f"{color[0]:02X}{color[1]:02X}{color[2]:02X}"
+
+
+def configure_document(document: Document) -> None:
+    section = document.sections[0]
+    section.top_margin = Inches(0.7)
+    section.bottom_margin = Inches(0.7)
+    section.left_margin = Inches(0.8)
+    section.right_margin = Inches(0.8)
+
+    normal = document.styles["Normal"]
+    normal.font.name = BODY_FONT
+    normal.font.size = Pt(10.5)
+
+    for style_name, size in {
+        "Heading 1": 20,
+        "Heading 2": 16,
+        "Heading 3": 13,
+        "Heading 4": 11.5,
+        "Heading 5": 10.5,
+        "Heading 6": 10,
+    }.items():
+        style = document.styles[style_name]
+        style.font.name = BODY_FONT
+        style.font.size = Pt(size)
+        style.font.bold = True
+        style.font.color.rgb = TITLE_COLOR
+
+
+def add_paragraph_shading(paragraph, fill: str) -> None:
+    p_pr = paragraph._p.get_or_add_pPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:fill"), fill)
+    p_pr.append(shd)
+
+
+def add_paragraph_border(paragraph, color: str = "D0D7DE") -> None:
+    p_pr = paragraph._p.get_or_add_pPr()
+    p_bdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), color)
+    p_bdr.append(bottom)
+    p_pr.append(p_bdr)
+
+
+def add_cell_shading(cell, fill: str) -> None:
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:fill"), fill)
+    tc_pr.append(shd)
+
+
+def add_hyperlink(paragraph, text: str, target: str, *, internal: bool = False, style: InlineStyle | None = None) -> None:
+    style = style or InlineStyle()
+    hyperlink = OxmlElement("w:hyperlink")
+    if internal:
+        hyperlink.set(qn("w:anchor"), target)
+    else:
+        rel_id = paragraph.part.relate_to(
+            target,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            is_external=True,
+        )
+        hyperlink.set(qn("r:id"), rel_id)
+
+    run = OxmlElement("w:r")
+    r_pr = OxmlElement("w:rPr")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), color_to_hex(style.color or LINK_COLOR))
+    r_pr.append(color)
+
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "single")
+    r_pr.append(underline)
+
+    if style.bold:
+        r_pr.append(OxmlElement("w:b"))
+    if style.italic:
+        r_pr.append(OxmlElement("w:i"))
+    if style.strike:
+        r_pr.append(OxmlElement("w:strike"))
+    if style.code:
+        fonts = OxmlElement("w:rFonts")
+        fonts.set(qn("w:ascii"), CODE_FONT)
+        fonts.set(qn("w:hAnsi"), CODE_FONT)
+        fonts.set(qn("w:cs"), CODE_FONT)
+        r_pr.append(fonts)
+
+    run.append(r_pr)
+    text_node = OxmlElement("w:t")
+    text_node.set(qn("xml:space"), "preserve")
+    text_node.text = text
+    run.append(text_node)
+    hyperlink.append(run)
+    paragraph._p.append(hyperlink)
+
+
+def add_bookmark(paragraph, name: str, bookmark_id: int) -> None:
+    start = OxmlElement("w:bookmarkStart")
+    start.set(qn("w:id"), str(bookmark_id))
+    start.set(qn("w:name"), name)
+    end = OxmlElement("w:bookmarkEnd")
+    end.set(qn("w:id"), str(bookmark_id))
+    paragraph._p.insert(0, start)
+    paragraph._p.append(end)
+
+
+def add_toc_field(paragraph, start_level: int = 1, end_level: int = 3) -> None:
+    run = paragraph.add_run()
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = f'TOC \\o "{start_level}-{end_level}" \\h \\z \\u'
+    separate = OxmlElement("w:fldChar")
+    separate.set(qn("w:fldCharType"), "separate")
+    placeholder = OxmlElement("w:t")
+    placeholder.text = "Actualiza la tabla de contenido en Word."
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    run._r.append(begin)
+    run._r.append(instr)
+    run._r.append(separate)
+    run._r.append(placeholder)
+    run._r.append(end)
+
+
+def markdown_to_html(markdown_text: str) -> str:
+    return markdown_lib.markdown(
+        markdown_text,
+        extensions=["extra", "tables", "fenced_code", "attr_list", "sane_lists", "toc"],
+        output_format="html5",
+    )
+
+
+def is_remote_source(src: str) -> bool:
+    return urlparse(src).scheme.lower() in {"http", "https"}
+
+
+def read_image_bytes(src: str, source_dir: Path) -> tuple[BytesIO | None, str | None]:
+    src = src.strip()
+    if not src:
+        return None, None
+
+    if src.startswith("data:"):
+        match = re.match(r"data:[^;]+;base64,(.+)", src, re.IGNORECASE | re.DOTALL)
+        if not match:
+            return None, None
+        return BytesIO(base64.b64decode(match.group(1))), None
+
+    if is_remote_source(src):
+        request = Request(src, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urlopen(request, timeout=20) as response:
+                return BytesIO(response.read()), None
+        except (URLError, TimeoutError, OSError) as exc:
+            return None, f"{src} (descarga falló: {exc})"
+
+    image_path = (source_dir / unquote(src)).resolve()
+    if not image_path.exists():
+        return None, str(image_path)
+    return BytesIO(image_path.read_bytes()), str(image_path)
+
+
+def apply_run_style(run, style: InlineStyle) -> None:
+    run.font.name = CODE_FONT if style.code else BODY_FONT
+    run.font.size = Pt(9.5 if style.code else 10.5)
+    run.bold = style.bold
+    run.italic = style.italic
+    run.font.strike = style.strike
+    run.underline = style.underline
+    if style.color is not None:
+        run.font.color.rgb = style.color
+
+
+def add_text(paragraph, text: str, style: InlineStyle = InlineStyle()) -> None:
+    if not text:
+        return
+    run = paragraph.add_run(text)
+    apply_run_style(run, style)
+
+
+def text_content(node) -> str:
+    return "".join(node.itertext()).strip()
+
+
+class MarkdownToDocxConverter:
+    def __init__(self, source_path: Path, output_path: Path) -> None:
+        self.source_path = source_path
+        self.output_path = output_path
+        self.source_dir = source_path.parent
+        self.document = Document()
+        configure_document(self.document)
+        self.available_width = (
+            self.document.sections[0].page_width
+            - self.document.sections[0].left_margin
+            - self.document.sections[0].right_margin
+        )
+        self.bookmarks: set[str] = set()
+        self.anchor_map: dict[str, str] = {}
+        self.bookmark_id = 1
+
+    def convert(self, markdown_text: str) -> Document:
+        html_text = markdown_to_html(markdown_text)
+        root = lxml_html.fromstring(f"<div>{html_text}</div>")
+        self._build_anchor_map(root)
+        self._render_toc_if_requested(markdown_text)
+        self._render_container(root)
+        return self.document
+
+    def _build_anchor_map(self, root) -> None:
+        for node in root.iterdescendants():
+            if node.tag not in HEADING_TAGS:
+                continue
+            heading_text = text_content(node)
+            anchor = node.get("id") or slugify(heading_text)
+            bookmark = unique_name(slugify(anchor), self.bookmarks)
+            self.anchor_map[anchor] = bookmark
+            self.anchor_map[slugify(anchor)] = bookmark
+            self.anchor_map[slugify(heading_text)] = bookmark
+
+    def _bookmark_for(self, anchor: str) -> str | None:
+        clean = anchor.lstrip("#")
+        return self.anchor_map.get(clean) or self.anchor_map.get(slugify(clean))
+
+    def _next_bookmark_id(self) -> int:
+        value = self.bookmark_id
+        self.bookmark_id += 1
+        return value
+
+    def _render_toc_if_requested(self, markdown_text: str) -> None:
+        if not TOC_PATTERN.search(markdown_text):
+            return
+        title = self.document.add_paragraph()
+        title.style = "Heading 1"
+        title.add_run("Tabla de contenido")
+        title.runs[0].font.color.rgb = TITLE_COLOR
+        toc = self.document.add_paragraph()
+        add_toc_field(toc)
+
+    def _render_container(self, root) -> None:
+        for child in root:
+            self._render_block(child)
+
+    def _render_block(self, node) -> None:
+        tag = getattr(node, "tag", None)
+
+        if tag in HEADING_TAGS:
+            self._render_heading(node)
+            return
+        if tag == "p":
+            if len(node) == 1 and node[0].tag == "img" and not (node.text or "").strip():
+                self._render_image(node[0])
+            else:
+                self._render_paragraph(node)
+            return
+        if tag in {"ul", "ol"}:
+            self._render_list(node)
+            return
+        if tag == "blockquote":
+            self._render_blockquote(node)
+            return
+        if tag == "pre":
+            self._render_pre(node)
+            return
+        if tag == "table":
+            self._render_table(node)
+            return
+        if tag == "hr":
+            self._render_hr()
+            return
+        if tag == "figure":
+            for child in node:
+                self._render_block(child)
+            return
+        if tag == "img":
+            self._render_image(node)
+            return
+        if tag in {"div", "section", "article", "nav", "aside"}:
+            for child in node:
+                self._render_block(child)
+            return
+        if tag in {"tbody", "thead", "tfoot", "tr", "td", "th"}:
+            return
+
+        if getattr(node, "text", None) and node.text.strip():
+            paragraph = self.document.add_paragraph()
+            self._render_inline_children(node, paragraph)
+        for child in node:
+            self._render_block(child)
+            if child.tail and child.tail.strip():
+                paragraph = self.document.add_paragraph()
+                add_text(paragraph, child.tail)
+
+    def _render_heading(self, node) -> None:
+        level = int(node.tag[1])
+        paragraph = self.document.add_paragraph(style=f"Heading {level}")
+        paragraph.paragraph_format.space_before = Pt(8)
+        paragraph.paragraph_format.space_after = Pt(4)
+        paragraph.add_run(text_content(node))
+        paragraph.runs[0].font.color.rgb = TITLE_COLOR
+
+        bookmark = self._bookmark_for(node.get("id") or slugify(text_content(node)))
+        if bookmark:
+            add_bookmark(paragraph, bookmark, self._next_bookmark_id())
+
+    def _render_paragraph(self, node) -> None:
+        paragraph = self.document.add_paragraph()
+        paragraph.paragraph_format.space_after = Pt(6)
+        paragraph.paragraph_format.space_before = Pt(0)
+        self._render_inline_children(node, paragraph)
+
+    def _render_inline_children(self, node, paragraph) -> None:
+        if node.text:
+            add_text(paragraph, node.text)
+        for child in node:
+            self._render_inline_node(child, paragraph, InlineStyle())
+            if child.tail:
+                add_text(paragraph, child.tail)
+
+    def _render_inline_node(self, node, paragraph, style: InlineStyle) -> None:
+        tag = getattr(node, "tag", None)
+
+        if tag == "br":
+            paragraph.add_run().add_break()
+            return
+        if tag == "a":
+            href = node.get("href", "")
+            label = text_content(node) or href
+            if href.startswith("#"):
+                bookmark = self._bookmark_for(href)
+                if bookmark:
+                    add_hyperlink(paragraph, label, bookmark, internal=True, style=style)
+                else:
+                    add_text(paragraph, label, style)
+            else:
+                add_hyperlink(paragraph, label, href, internal=False, style=style)
+            return
+        if tag == "img":
+            self._render_image(node, paragraph)
+            return
+
+        next_style = InlineStyle(
+            bold=style.bold or tag in {"strong", "b"},
+            italic=style.italic or tag in {"em", "i"},
+            code=style.code or tag == "code",
+            strike=style.strike or tag in {"del", "s"},
+            underline=style.underline or tag == "u",
+            color=style.color,
+        )
+
+        if node.text:
+            add_text(paragraph, node.text, next_style)
+        for child in node:
+            self._render_inline_node(child, paragraph, next_style)
+            if child.tail:
+                add_text(paragraph, child.tail, style)
+
+    def _render_list(self, node, depth: int = 0) -> None:
+        style_name = "List Number" if node.tag == "ol" else "List Bullet"
+        for li in node.xpath("./li"):
+            paragraph = self.document.add_paragraph(style=style_name)
+            paragraph.paragraph_format.left_indent = Inches(0.25 * depth)
+            paragraph.paragraph_format.space_after = Pt(0)
+            paragraph.paragraph_format.space_before = Pt(0)
+
+            if li.text and li.text.strip():
+                add_text(paragraph, li.text)
+
+            for child in li:
+                if child.tag in {"ul", "ol"}:
+                    self._render_list(child, depth + 1)
+                else:
+                    self._render_inline_node(child, paragraph, InlineStyle())
+                if child.tail and child.tail.strip():
+                    add_text(paragraph, child.tail)
+
+    def _render_blockquote(self, node) -> None:
+        for child in node:
+            paragraph = self.document.add_paragraph()
+            paragraph.paragraph_format.left_indent = Inches(0.3)
+            paragraph.paragraph_format.space_before = Pt(2)
+            paragraph.paragraph_format.space_after = Pt(2)
+            add_paragraph_shading(paragraph, QUOTE_FILL)
+            self._render_block(child)
+
+    def _render_pre(self, node) -> None:
+        paragraph = self.document.add_paragraph()
+        paragraph.paragraph_format.left_indent = Inches(0.15)
+        paragraph.paragraph_format.right_indent = Inches(0.15)
+        paragraph.paragraph_format.space_before = Pt(4)
+        paragraph.paragraph_format.space_after = Pt(6)
+        add_paragraph_shading(paragraph, CODE_FILL)
+        add_paragraph_border(paragraph)
+        code_text = text_content(node)
+        run = paragraph.add_run(code_text)
+        run.font.name = CODE_FONT
+        run.font.size = Pt(9)
+
+    def _render_table(self, node) -> None:
+        rows = node.xpath(".//tr")
+        if not rows:
+            return
+
+        column_count = max(len(r.xpath("./th|./td")) for r in rows)
+        table = self.document.add_table(rows=0, cols=column_count)
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.style = "Table Grid"
+
+        for row_index, row in enumerate(rows):
+            cells = row.xpath("./th|./td")
+            docx_row = table.add_row()
+            for col_index in range(column_count):
+                cell = docx_row.cells[col_index]
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
+                if col_index < len(cells):
+                    if row_index == 0:
+                        add_cell_shading(cell, TABLE_HEAD_FILL)
+                    self._render_table_cell(cell, cells[col_index])
+                else:
+                    cell.text = ""
+
+    def _render_table_cell(self, cell, node) -> None:
+        if node.text and node.text.strip():
+            paragraph = cell.paragraphs[0]
+            self._render_inline_children(node, paragraph)
+        for child in node:
+            if child.tag in BLOCK_TAGS:
+                if child.tag == "p":
+                    paragraph = cell.add_paragraph()
+                    self._render_inline_children(child, paragraph)
+                else:
+                    self._render_block(child)
+            else:
+                paragraph = cell.paragraphs[0]
+                self._render_inline_node(child, paragraph, InlineStyle())
+            if child.tail and child.tail.strip():
+                paragraph = cell.add_paragraph()
+                add_text(paragraph, child.tail)
+
+    def _render_image(self, node, paragraph=None) -> None:
+        src = node.get("src", "")
+        alt = node.get("alt", "Imagen")
+        image_bytes, resolved = read_image_bytes(src, self.source_dir)
+        target_paragraph = paragraph or self.document.add_paragraph()
+        if image_bytes is None:
+            add_text(target_paragraph, f"[Imagen no encontrada: {src or resolved or alt}]")
+            return
+        run = target_paragraph.add_run()
+        try:
+            run.add_picture(image_bytes, width=self.available_width)
+        except Exception as exc:
+            print(f"Advertencia: no se pudo insertar la imagen '{alt}' ({src}): {exc}", file=sys.stderr)
+            add_text(target_paragraph, f"[No fue posible insertar la imagen: {alt}]")
+
+    def _render_hr(self) -> None:
+        paragraph = self.document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = paragraph.add_run("─" * 24)
+        run.font.color.rgb = HR_COLOR
+
+
+def convert_markdown_file(source_path: Path, output_path: Path | None = None) -> Path:
+    source_path = source_path.resolve()
+    if output_path is None:
+        output_path = source_path.with_suffix(".docx")
+    output_path = output_path.resolve()
+
+    markdown_text = source_path.read_text(encoding="utf-8")
+    converter = MarkdownToDocxConverter(source_path, output_path)
+    document = converter.convert(markdown_text)
+    document.save(output_path)
+    return output_path
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Convierte un archivo Markdown a Word con formato conservado.")
+    parser.add_argument("input", help="Ruta del archivo .md")
+    parser.add_argument("-o", "--output", help="Ruta de salida .docx opcional")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    source_path = Path(args.input)
+    if not source_path.exists():
+        raise FileNotFoundError(f"No existe el archivo de entrada: {source_path}")
+
+    output_path = Path(args.output) if args.output else None
+    result = convert_markdown_file(source_path, output_path)
+    print(f"Documento creado: {result}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
