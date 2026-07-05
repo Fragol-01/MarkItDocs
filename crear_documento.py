@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import base64
+import glob
+import json
+import logging
 import re
-import sys
+import time
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -20,15 +23,43 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from lxml import html as lxml_html
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python <3.11 fallback
+    tomllib = None
 
-BODY_FONT = "Calibri"
-CODE_FONT = "Consolas"
-TITLE_COLOR = RGBColor(31, 78, 121)
-LINK_COLOR = RGBColor(0, 102, 204)
-QUOTE_FILL = "F8F9FA"
-TABLE_HEAD_FILL = "D9EAF7"
-CODE_FILL = "F6F8FA"
-HR_COLOR = RGBColor(180, 190, 205)
+logger = logging.getLogger("crear_documento")
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+
+MARKDOWN_EXTENSIONS = {".md", ".markdown"}
+
+DEFAULT_THEME = {
+    "body_font": "Calibri",
+    "code_font": "Consolas",
+    "title_color": [31, 78, 121],
+    "link_color": [0, 102, 204],
+    "quote_fill": "F8F9FA",
+    "table_head_fill": "D9EAF7",
+    "code_fill": "F6F8FA",
+    "hr_color": [180, 190, 205],
+}
+
+BODY_FONT = DEFAULT_THEME["body_font"]
+CODE_FONT = DEFAULT_THEME["code_font"]
+TITLE_COLOR = RGBColor(*DEFAULT_THEME["title_color"])
+LINK_COLOR = RGBColor(*DEFAULT_THEME["link_color"])
+QUOTE_FILL = DEFAULT_THEME["quote_fill"]
+TABLE_HEAD_FILL = DEFAULT_THEME["table_head_fill"]
+CODE_FILL = DEFAULT_THEME["code_fill"]
+HR_COLOR = RGBColor(*DEFAULT_THEME["hr_color"])
+
+PAGE_BREAK_PATTERN = re.compile(r"(?im)^(?:\\pagebreak|<!--\s*pagebreak\s*-->)\s*$")
+MAX_IMAGE_DOWNLOAD_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 1.5
 
 HEADING_TAGS = {f"h{i}" for i in range(1, 7)}
 BLOCK_TAGS = {
@@ -84,15 +115,40 @@ def color_to_hex(color: RGBColor) -> str:
     return f"{color[0]:02X}{color[1]:02X}{color[2]:02X}"
 
 
-def configure_document(document: Document) -> None:
+def load_theme(theme_path: Path | None) -> dict:
+    """Carga un tema de estilos desde un .toml/.json, o usa el tema por defecto."""
+    if theme_path is None:
+        return dict(DEFAULT_THEME)
+
+    theme_path = Path(theme_path)
+    if not theme_path.exists():
+        raise FileNotFoundError(f"No existe el archivo de tema: {theme_path}")
+
+    if theme_path.suffix == ".json":
+        overrides = json.loads(theme_path.read_text(encoding="utf-8"))
+    elif theme_path.suffix == ".toml":
+        if tomllib is None:
+            raise RuntimeError("Se requiere Python 3.11+ para leer temas .toml")
+        overrides = tomllib.loads(theme_path.read_text(encoding="utf-8"))
+    else:
+        raise ValueError(f"Formato de tema no soportado: {theme_path.suffix} (usa .json o .toml)")
+
+    theme = dict(DEFAULT_THEME)
+    theme.update(overrides)
+    return theme
+
+
+def configure_document(document: Document, theme: dict) -> None:
     section = document.sections[0]
     section.top_margin = Inches(0.7)
     section.bottom_margin = Inches(0.7)
     section.left_margin = Inches(0.8)
     section.right_margin = Inches(0.8)
 
+    title_color = RGBColor(*theme["title_color"])
+
     normal = document.styles["Normal"]
-    normal.font.name = BODY_FONT
+    normal.font.name = theme["body_font"]
     normal.font.size = Pt(10.5)
 
     for style_name, size in {
@@ -104,10 +160,10 @@ def configure_document(document: Document) -> None:
         "Heading 6": 10,
     }.items():
         style = document.styles[style_name]
-        style.font.name = BODY_FONT
+        style.font.name = theme["body_font"]
         style.font.size = Pt(size)
         style.font.bold = True
-        style.font.color.rgb = TITLE_COLOR
+        style.font.color.rgb = title_color
 
 
 def add_paragraph_shading(paragraph, fill: str) -> None:
@@ -136,8 +192,19 @@ def add_cell_shading(cell, fill: str) -> None:
     tc_pr.append(shd)
 
 
-def add_hyperlink(paragraph, text: str, target: str, *, internal: bool = False, style: InlineStyle | None = None) -> None:
+def add_hyperlink(
+    paragraph,
+    text: str,
+    target: str,
+    *,
+    internal: bool = False,
+    style: InlineStyle | None = None,
+    link_color: RGBColor | None = None,
+    code_font: str | None = None,
+) -> None:
     style = style or InlineStyle()
+    link_color = link_color or LINK_COLOR
+    code_font = code_font or CODE_FONT
     hyperlink = OxmlElement("w:hyperlink")
     if internal:
         hyperlink.set(qn("w:anchor"), target)
@@ -152,7 +219,7 @@ def add_hyperlink(paragraph, text: str, target: str, *, internal: bool = False, 
     run = OxmlElement("w:r")
     r_pr = OxmlElement("w:rPr")
     color = OxmlElement("w:color")
-    color.set(qn("w:val"), color_to_hex(style.color or LINK_COLOR))
+    color.set(qn("w:val"), color_to_hex(style.color or link_color))
     r_pr.append(color)
 
     underline = OxmlElement("w:u")
@@ -167,9 +234,9 @@ def add_hyperlink(paragraph, text: str, target: str, *, internal: bool = False, 
         r_pr.append(OxmlElement("w:strike"))
     if style.code:
         fonts = OxmlElement("w:rFonts")
-        fonts.set(qn("w:ascii"), CODE_FONT)
-        fonts.set(qn("w:hAnsi"), CODE_FONT)
-        fonts.set(qn("w:cs"), CODE_FONT)
+        fonts.set(qn("w:ascii"), code_font)
+        fonts.set(qn("w:hAnsi"), code_font)
+        fonts.set(qn("w:cs"), code_font)
         r_pr.append(fonts)
 
     run.append(r_pr)
@@ -236,11 +303,20 @@ def read_image_bytes(src: str, source_dir: Path) -> tuple[BytesIO | None, str | 
 
     if is_remote_source(src):
         request = Request(src, headers={"User-Agent": "Mozilla/5.0"})
-        try:
-            with urlopen(request, timeout=20) as response:
-                return BytesIO(response.read()), None
-        except (URLError, TimeoutError, OSError) as exc:
-            return None, f"{src} (descarga falló: {exc})"
+        last_error: Exception | None = None
+        for attempt in range(1, MAX_IMAGE_DOWNLOAD_RETRIES + 1):
+            try:
+                with urlopen(request, timeout=20) as response:
+                    return BytesIO(response.read()), None
+            except (URLError, TimeoutError, OSError) as exc:
+                last_error = exc
+                logger.warning(
+                    "Descarga de imagen falló (intento %d/%d) %s: %s",
+                    attempt, MAX_IMAGE_DOWNLOAD_RETRIES, src, exc,
+                )
+                if attempt < MAX_IMAGE_DOWNLOAD_RETRIES:
+                    time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+        return None, f"{src} (descarga falló tras {MAX_IMAGE_DOWNLOAD_RETRIES} intentos: {last_error})"
 
     image_path = (source_dir / unquote(src)).resolve()
     if not image_path.exists():
@@ -248,8 +324,10 @@ def read_image_bytes(src: str, source_dir: Path) -> tuple[BytesIO | None, str | 
     return BytesIO(image_path.read_bytes()), str(image_path)
 
 
-def apply_run_style(run, style: InlineStyle) -> None:
-    run.font.name = CODE_FONT if style.code else BODY_FONT
+def apply_run_style(run, style: InlineStyle, body_font: str | None = None, code_font: str | None = None) -> None:
+    body_font = body_font or BODY_FONT
+    code_font = code_font or CODE_FONT
+    run.font.name = code_font if style.code else body_font
     run.font.size = Pt(9.5 if style.code else 10.5)
     run.bold = style.bold
     run.italic = style.italic
@@ -259,11 +337,17 @@ def apply_run_style(run, style: InlineStyle) -> None:
         run.font.color.rgb = style.color
 
 
-def add_text(paragraph, text: str, style: InlineStyle = InlineStyle()) -> None:
+def add_text(
+    paragraph,
+    text: str,
+    style: InlineStyle = InlineStyle(),
+    body_font: str | None = None,
+    code_font: str | None = None,
+) -> None:
     if not text:
         return
     run = paragraph.add_run(text)
-    apply_run_style(run, style)
+    apply_run_style(run, style, body_font=body_font, code_font=code_font)
 
 
 def text_content(node) -> str:
@@ -271,12 +355,17 @@ def text_content(node) -> str:
 
 
 class MarkdownToDocxConverter:
-    def __init__(self, source_path: Path, output_path: Path) -> None:
+    def __init__(self, source_path: Path, output_path: Path, theme: dict | None = None) -> None:
         self.source_path = source_path
         self.output_path = output_path
         self.source_dir = source_path.parent
+        self.theme = theme or DEFAULT_THEME
+        self.title_color = RGBColor(*self.theme["title_color"])
+        self.link_color = RGBColor(*self.theme["link_color"])
+        self.body_font = self.theme["body_font"]
+        self.code_font = self.theme["code_font"]
         self.document = Document()
-        configure_document(self.document)
+        configure_document(self.document, self.theme)
         self.available_width = (
             self.document.sections[0].page_width
             - self.document.sections[0].left_margin
@@ -287,8 +376,10 @@ class MarkdownToDocxConverter:
         self.bookmark_id = 1
 
     def convert(self, markdown_text: str) -> Document:
-        html_text = markdown_to_html(markdown_text)
-        root = lxml_html.fromstring(f"<div>{html_text}</div>")
+        segments = PAGE_BREAK_PATTERN.split(markdown_text)
+        html_segments = [markdown_to_html(segment) for segment in segments]
+        combined_html = "<hr class=\"__pagebreak__\">".join(html_segments)
+        root = lxml_html.fromstring(f"<div>{combined_html}</div>")
         self._build_anchor_map(root)
         self._render_toc_if_requested(markdown_text)
         self._render_container(root)
@@ -314,13 +405,23 @@ class MarkdownToDocxConverter:
         self.bookmark_id += 1
         return value
 
+    def _add_text(self, paragraph, text: str, style: InlineStyle = InlineStyle()) -> None:
+        add_text(paragraph, text, style, body_font=self.body_font, code_font=self.code_font)
+
+    def _add_hyperlink(self, paragraph, text: str, target: str, *, internal: bool = False, style: InlineStyle | None = None) -> None:
+        add_hyperlink(
+            paragraph, text, target,
+            internal=internal, style=style,
+            link_color=self.link_color, code_font=self.code_font,
+        )
+
     def _render_toc_if_requested(self, markdown_text: str) -> None:
         if not TOC_PATTERN.search(markdown_text):
             return
         title = self.document.add_paragraph()
         title.style = "Heading 1"
         title.add_run("Tabla de contenido")
-        title.runs[0].font.color.rgb = TITLE_COLOR
+        title.runs[0].font.color.rgb = self.title_color
         toc = self.document.add_paragraph()
         add_toc_field(toc)
 
@@ -353,7 +454,10 @@ class MarkdownToDocxConverter:
             self._render_table(node)
             return
         if tag == "hr":
-            self._render_hr()
+            if node.get("class") == "__pagebreak__":
+                self.document.add_page_break()
+            else:
+                self._render_hr()
             return
         if tag == "figure":
             for child in node:
@@ -376,7 +480,7 @@ class MarkdownToDocxConverter:
             self._render_block(child)
             if child.tail and child.tail.strip():
                 paragraph = self.document.add_paragraph()
-                add_text(paragraph, child.tail)
+                self._add_text(paragraph, child.tail)
 
     def _render_heading(self, node) -> None:
         level = int(node.tag[1])
@@ -384,7 +488,7 @@ class MarkdownToDocxConverter:
         paragraph.paragraph_format.space_before = Pt(8)
         paragraph.paragraph_format.space_after = Pt(4)
         paragraph.add_run(text_content(node))
-        paragraph.runs[0].font.color.rgb = TITLE_COLOR
+        paragraph.runs[0].font.color.rgb = self.title_color
 
         bookmark = self._bookmark_for(node.get("id") or slugify(text_content(node)))
         if bookmark:
@@ -398,11 +502,11 @@ class MarkdownToDocxConverter:
 
     def _render_inline_children(self, node, paragraph) -> None:
         if node.text:
-            add_text(paragraph, node.text)
+            self._add_text(paragraph, node.text)
         for child in node:
             self._render_inline_node(child, paragraph, InlineStyle())
             if child.tail:
-                add_text(paragraph, child.tail)
+                self._add_text(paragraph, child.tail)
 
     def _render_inline_node(self, node, paragraph, style: InlineStyle) -> None:
         tag = getattr(node, "tag", None)
@@ -416,11 +520,11 @@ class MarkdownToDocxConverter:
             if href.startswith("#"):
                 bookmark = self._bookmark_for(href)
                 if bookmark:
-                    add_hyperlink(paragraph, label, bookmark, internal=True, style=style)
+                    self._add_hyperlink(paragraph, label, bookmark, internal=True, style=style)
                 else:
-                    add_text(paragraph, label, style)
+                    self._add_text(paragraph, label, style)
             else:
-                add_hyperlink(paragraph, label, href, internal=False, style=style)
+                self._add_hyperlink(paragraph, label, href, internal=False, style=style)
             return
         if tag == "img":
             self._render_image(node, paragraph)
@@ -436,11 +540,11 @@ class MarkdownToDocxConverter:
         )
 
         if node.text:
-            add_text(paragraph, node.text, next_style)
+            self._add_text(paragraph, node.text, next_style)
         for child in node:
             self._render_inline_node(child, paragraph, next_style)
             if child.tail:
-                add_text(paragraph, child.tail, style)
+                self._add_text(paragraph, child.tail, style)
 
     def _render_list(self, node, depth: int = 0) -> None:
         style_name = "List Number" if node.tag == "ol" else "List Bullet"
@@ -451,7 +555,7 @@ class MarkdownToDocxConverter:
             paragraph.paragraph_format.space_before = Pt(0)
 
             if li.text and li.text.strip():
-                add_text(paragraph, li.text)
+                self._add_text(paragraph, li.text)
 
             for child in li:
                 if child.tag in {"ul", "ol"}:
@@ -459,7 +563,7 @@ class MarkdownToDocxConverter:
                 else:
                     self._render_inline_node(child, paragraph, InlineStyle())
                 if child.tail and child.tail.strip():
-                    add_text(paragraph, child.tail)
+                    self._add_text(paragraph, child.tail)
 
     def _render_blockquote(self, node) -> None:
         for child in node:
@@ -467,7 +571,7 @@ class MarkdownToDocxConverter:
             paragraph.paragraph_format.left_indent = Inches(0.3)
             paragraph.paragraph_format.space_before = Pt(2)
             paragraph.paragraph_format.space_after = Pt(2)
-            add_paragraph_shading(paragraph, QUOTE_FILL)
+            add_paragraph_shading(paragraph, self.theme["quote_fill"])
             self._render_block(child)
 
     def _render_pre(self, node) -> None:
@@ -476,11 +580,11 @@ class MarkdownToDocxConverter:
         paragraph.paragraph_format.right_indent = Inches(0.15)
         paragraph.paragraph_format.space_before = Pt(4)
         paragraph.paragraph_format.space_after = Pt(6)
-        add_paragraph_shading(paragraph, CODE_FILL)
+        add_paragraph_shading(paragraph, self.theme["code_fill"])
         add_paragraph_border(paragraph)
         code_text = text_content(node)
         run = paragraph.add_run(code_text)
-        run.font.name = CODE_FONT
+        run.font.name = self.code_font
         run.font.size = Pt(9)
 
     def _render_table(self, node) -> None:
@@ -501,7 +605,7 @@ class MarkdownToDocxConverter:
                 cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
                 if col_index < len(cells):
                     if row_index == 0:
-                        add_cell_shading(cell, TABLE_HEAD_FILL)
+                        add_cell_shading(cell, self.theme["table_head_fill"])
                     self._render_table_cell(cell, cells[col_index])
                 else:
                     cell.text = ""
@@ -522,7 +626,7 @@ class MarkdownToDocxConverter:
                 self._render_inline_node(child, paragraph, InlineStyle())
             if child.tail and child.tail.strip():
                 paragraph = cell.add_paragraph()
-                add_text(paragraph, child.tail)
+                self._add_text(paragraph, child.tail)
 
     def _render_image(self, node, paragraph=None) -> None:
         src = node.get("src", "")
@@ -530,39 +634,118 @@ class MarkdownToDocxConverter:
         image_bytes, resolved = read_image_bytes(src, self.source_dir)
         target_paragraph = paragraph or self.document.add_paragraph()
         if image_bytes is None:
-            add_text(target_paragraph, f"[Imagen no encontrada: {src or resolved or alt}]")
+            self._add_text(target_paragraph, f"[Imagen no encontrada: {src or resolved or alt}]")
             return
         run = target_paragraph.add_run()
         try:
             run.add_picture(image_bytes, width=self.available_width)
         except Exception as exc:
-            print(f"Advertencia: no se pudo insertar la imagen '{alt}' ({src}): {exc}", file=sys.stderr)
-            add_text(target_paragraph, f"[No fue posible insertar la imagen: {alt}]")
+            logger.warning("No se pudo insertar la imagen '%s' (%s): %s", alt, src, exc)
+            self._add_text(target_paragraph, f"[No fue posible insertar la imagen: {alt}]")
 
     def _render_hr(self) -> None:
         paragraph = self.document.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = paragraph.add_run("─" * 24)
-        run.font.color.rgb = HR_COLOR
+        run.font.color.rgb = RGBColor(*self.theme["hr_color"])
 
 
-def convert_markdown_file(source_path: Path, output_path: Path | None = None) -> Path:
-    source_path = source_path.resolve()
+def validate_markdown_extension(source_path: Path) -> None:
+    if source_path.suffix.lower() not in MARKDOWN_EXTENSIONS:
+        allowed = ", ".join(sorted(MARKDOWN_EXTENSIONS))
+        raise ValueError(
+            f"'{source_path.name}' no tiene una extensión Markdown reconocida ({allowed}). "
+            "Verifica que el archivo sea realmente Markdown antes de convertir."
+        )
+
+
+def convert_markdown_file(
+    source_path: Path,
+    output_path: Path | None = None,
+    theme_path: Path | None = None,
+) -> Path:
+    source_path = Path(source_path).resolve()
+    if not source_path.exists():
+        raise FileNotFoundError(f"No existe el archivo de entrada: {source_path}")
+    validate_markdown_extension(source_path)
+
     if output_path is None:
         output_path = source_path.with_suffix(".docx")
-    output_path = output_path.resolve()
+    output_path = Path(output_path).resolve()
 
+    theme = load_theme(theme_path)
     markdown_text = source_path.read_text(encoding="utf-8")
-    converter = MarkdownToDocxConverter(source_path, output_path)
+    converter = MarkdownToDocxConverter(source_path, output_path, theme=theme)
     document = converter.convert(markdown_text)
     document.save(output_path)
+    logger.info("Documento creado: %s", output_path)
     return output_path
 
 
+def convert_many(
+    patterns: list[str],
+    output_dir: Path | None = None,
+    theme_path: Path | None = None,
+) -> list[Path]:
+    """Convierte múltiples archivos .md que coincidan con los patrones glob dados."""
+    source_paths: list[Path] = []
+    for pattern in patterns:
+        pattern_path = Path(pattern)
+        if pattern_path.exists() and pattern_path.is_file():
+            source_paths.append(pattern_path)
+        else:
+            matches = sorted(Path(p) for p in glob.glob(pattern))
+            source_paths.extend(m for m in matches if m.is_file())
+
+    if not source_paths:
+        raise FileNotFoundError(f"Ningún archivo coincide con los patrones: {patterns}")
+
+    results = []
+    for source_path in source_paths:
+        try:
+            validate_markdown_extension(source_path)
+        except ValueError as exc:
+            logger.warning("Omitiendo %s: %s", source_path, exc)
+            continue
+
+        output_path = None
+        if output_dir is not None:
+            output_path = Path(output_dir) / source_path.with_suffix(".docx").name
+
+        result = convert_markdown_file(source_path, output_path, theme_path=theme_path)
+        results.append(result)
+
+    return results
+
+
+def watch_and_convert(source_path: Path, output_path: Path | None, theme_path: Path | None) -> None:
+    """Vigila un archivo .md y reconvierte automáticamente cada vez que cambia."""
+    source_path = Path(source_path).resolve()
+    last_mtime: float | None = None
+    logger.info("Modo watch activo sobre %s (Ctrl+C para detener)", source_path)
+    try:
+        while True:
+            if not source_path.exists():
+                time.sleep(1)
+                continue
+            mtime = source_path.stat().st_mtime
+            if mtime != last_mtime:
+                last_mtime = mtime
+                try:
+                    convert_markdown_file(source_path, output_path, theme_path=theme_path)
+                except Exception as exc:
+                    logger.error("Falló la reconversión: %s", exc)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Modo watch detenido.")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Convierte un archivo Markdown a Word con formato conservado.")
-    parser.add_argument("input", help="Ruta del archivo .md")
-    parser.add_argument("-o", "--output", help="Ruta de salida .docx opcional")
+    parser = argparse.ArgumentParser(description="Convierte uno o más archivos Markdown a Word con formato conservado.")
+    parser.add_argument("input", nargs="+", help="Ruta(s) o patrón(es) glob de archivo(s) .md de entrada")
+    parser.add_argument("-o", "--output", help="Ruta de salida .docx (un solo archivo) o carpeta de salida (batch)")
+    parser.add_argument("--theme", help="Ruta a un archivo de tema .json o .toml")
+    parser.add_argument("--watch", action="store_true", help="Vigila el archivo de entrada y reconvierte al detectar cambios (solo un archivo)")
     return parser
 
 
@@ -570,14 +753,31 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    source_path = Path(args.input)
-    if not source_path.exists():
-        raise FileNotFoundError(f"No existe el archivo de entrada: {source_path}")
+    theme_path = Path(args.theme) if args.theme else None
 
-    output_path = Path(args.output) if args.output else None
-    result = convert_markdown_file(source_path, output_path)
-    print(f"Documento creado: {result}")
-    return 0
+    try:
+        if args.watch:
+            if len(args.input) != 1:
+                print("Error: --watch solo admite un único archivo de entrada.")
+                return 1
+            watch_and_convert(Path(args.input[0]), Path(args.output) if args.output else None, theme_path)
+            return 0
+
+        if len(args.input) == 1 and Path(args.input[0]).exists() and Path(args.input[0]).is_file():
+            output_path = Path(args.output) if args.output else None
+            result = convert_markdown_file(Path(args.input[0]), output_path, theme_path=theme_path)
+            print(f"Documento creado: {result}")
+            return 0
+
+        output_dir = Path(args.output) if args.output else None
+        results = convert_many(args.input, output_dir=output_dir, theme_path=theme_path)
+        for result in results:
+            print(f"Documento creado: {result}")
+        print(f"Total: {len(results)} documento(s) generado(s).")
+        return 0
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        print(f"Error: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

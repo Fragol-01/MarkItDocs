@@ -1,8 +1,8 @@
 # 📑 Índice del Proyecto - MD to DOCX Converter
 
-**Última actualización:** 2026-07-04  
+**Última actualización:** 2026-07-05  
 **Estado:** ✅ Completado y Funcional  
-**Versión:** 1.0
+**Versión:** 1.1
 
 ---
 
@@ -39,7 +39,7 @@ C:\Users\DANNY\Desktop\Modelo de negocio Web/
 │
 ├── 🎯 EJECUTABLE (Distribuir este)
 │   └── dist/
-│       └── MD_to_DOCX.exe             (17 MB) ← App standalone
+│       └── MD_to_DOCX.exe             (41 MB) ← App standalone
 │
 ├── 🔨 COMPILACIÓN (Temporal)
 │   ├── build/
@@ -118,9 +118,9 @@ python crear_documento.py entrada.md -o salida.docx
 |---------|-------|
 | **Líneas de Código** | ~620 (crear_documento.py) |
 | **Dependencias** | 5 paquetes |
-| **Tamaño Ejecutable** | 17 MB |
+| **Tamaño Ejecutable** | 41 MB |
 | **Tiempo de Compilación** | ~50 segundos |
-| **Python Soportado** | 3.10+ (probado en 3.14.6) |
+| **Python Soportado** | 3.10+ (probado en 3.14.6; temas `.toml` requieren 3.11+) |
 | **Windows Soportado** | 7, 8, 10, 11+ |
 
 ---
@@ -163,7 +163,7 @@ pyinstaller --onefile --windowed --name="MD_to_DOCX" --icon=NONE app.py
 
 ### Resultado
 ```
-✅ Ejecutable standalone de 17 MB
+✅ Ejecutable standalone de 41 MB
 ✅ Sin dependencia de Python externa
 ✅ Sin instalador requerido
 ✅ Funciona en Windows 7+
@@ -182,8 +182,9 @@ pyinstaller --onefile --windowed --name="MD_to_DOCX" --icon=NONE app.py
 ┌─────────────────────────────────────┐
 │   Interface Layer                   │
 │  ┌──────────────┐    ┌──────────┐  │
-│  │   PySimpleGUI│    │   CLI    │  │
-│  │   (app.py)   │    │  (argparse)│ │
+│  │ CustomTkinter│    │   CLI    │  │
+│  │ + tkinterdnd2│    │  (argparse)│ │
+│  │   (app.py)   │    │  batch/watch│ │
 │  └──────┬───────┘    └─────┬────┘  │
 └─────────┼────────────────────┼──────┘
           │                    │
@@ -192,6 +193,7 @@ pyinstaller --onefile --windowed --name="MD_to_DOCX" --icon=NONE app.py
 ┌──────────────────▼──────────────────┐
 │  API Layer                          │
 │  convert_markdown_file()            │
+│  convert_markdown_to_pdf() (MarkItPDF)│
 │  MarkdownToDocxConverter.convert()  │
 └──────────────────┬──────────────────┘
                    │
@@ -241,18 +243,21 @@ Funciones públicas:
 
 **Líneas:** ~620 (código limpio, optimizado)
 
-### `app.py` (3.1 KB)
-**Interfaz gráfica PySimpleGUI**
+### `app.py`
+**Interfaz gráfica CustomTkinter + tkinterdnd2**
 
-Funciones:
-- `safe_convert()` - Conversión asincrónica
-- `main()` - Bucle de eventos GUI
+Clases/funciones:
+- `App` - Orquesta la ventana y el estado de la GUI
+- `DnDWindow` - Mixin CTk + TkinterDnD para drag-and-drop nativo
+- `QueueLogHandler` - Reenvía logs del motor de conversión al log box
 
 Características:
-- Tema LightBlue
-- Selección de archivo con navegador
-- Log en tiempo real
-- Procesamiento sin bloqueo
+- Drag-and-drop real de archivos `.md` (con validación de extensión)
+- Selección de archivo(s), carpeta de salida y tema con diálogos nativos
+- Botones "Convertir a Word" y "Convertir a PDF" (este último vía MarkItPDF)
+- Barra de progreso indeterminada mientras convierte
+- Log en tiempo real (conectado al logger de `crear_documento`)
+- Procesamiento sin bloqueo (worker thread + cola de eventos)
 
 ---
 
@@ -273,8 +278,9 @@ Características:
 python-docx >= 1.2.0     # Manipulación Word
 markdown >= 3.0          # Conversión MD→HTML
 lxml >= 6.1.1           # Parseo XML/HTML
-pillow >= 12.0          # Procesamiento imágenes
-PySimpleGUI >= 4.0      # Interfaz GUI
+customtkinter           # Interfaz gráfica moderna
+tkinterdnd2             # Drag-and-drop real
+markitpdf (opcional)    # Exportar a PDF (repo hermano)
 ```
 
 ---
@@ -310,7 +316,7 @@ for md_file in Path('.').glob('*.md'):
 
 ✅ **Código compilado:** Sin errores (`py_compile` pasado)  
 ✅ **Dependencias:** Todas instaladas correctamente  
-✅ **Ejecutable:** Generado y funcional (17 MB)  
+✅ **Ejecutable:** Generado y funcional (41 MB)  
 ✅ **Pruebas:** Conversión verificada en archivo de ejemplo  
 ✅ **Documentación:** Completa y actualizada  
 
@@ -358,7 +364,7 @@ signtool sign /f certificado.pfx MD_to_DOCX.exe
 
 Si vas a compartir este proyecto:
 
-- [ ] Copia `dist/MD_to_DOCX.exe` (17 MB)
+- [ ] Copia `dist/MD_to_DOCX.exe` (41 MB)
 - [ ] Incluye `GUIA_RAPIDA.md` (para usuarios)
 - [ ] Incluye `DOCUMENTACION.md` (referencia)
 - [ ] Verifica que el .exe funciona en otra carpeta

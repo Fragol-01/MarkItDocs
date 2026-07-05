@@ -5,10 +5,9 @@
 ### Opción 1: Ejecutable (Sin instalación)
 ```
 1. Descarga/Abre: MD_to_DOCX.exe
-2. Haz doble clic
-3. Selecciona archivo .md
-4. Haz clic "Convertir"
-5. ¡Listo! Tu .docx está listo
+2. Arrastra tu(s) archivo(s) .md a la ventana (o usa "Seleccionar")
+3. Haz clic "Convertir a Word" o "Convertir a PDF"
+4. ¡Listo! Tu documento está en la carpeta de salida
 ```
 
 ### Opción 2: Desde Python
@@ -21,6 +20,12 @@ python app.py
 
 # O línea de comandos:
 python crear_documento.py documento.md -o salida.docx
+
+# Batch (varios archivos):
+python crear_documento.py "carpeta/*.md" -o carpeta_salida/
+
+# Watch mode (reconvierte al guardar cambios):
+python crear_documento.py documento.md --watch
 ```
 
 ---
@@ -65,7 +70,12 @@ R: NO. El .exe incluye todo. Solo descárgalo y úsalo.
 R: Todos. Cualquier archivo Markdown estándar.
 
 **P: ¿Puedo convertir múltiples archivos?**  
-R: Sí. En la GUI arrastra varios archivos.
+R: Sí. En la GUI arrastra varios archivos a la vez (drag-and-drop real), o
+usa `crear_documento.py "carpeta/*.md"` desde la CLI.
+
+**P: ¿Puedo exportar a PDF además de Word?**  
+R: Sí, con el botón "Convertir a PDF" (requiere el repo hermano MarkItPDF
+instalado — ver README.md).
 
 **P: ¿Se guarda en la misma carpeta?**  
 R: Sí, por defecto. Puedes cambiar la ubicación.

@@ -2,7 +2,12 @@
 
 **Documento:** Registro técnico del proceso de compilación con PyInstaller  
 **Fecha:** 2026-07-04  
-**Estado:** ✅ Completado exitosamente  
+**Estado:** ✅ Completado exitosamente (build histórico v1.0, ver nota abajo)
+
+> ⚠️ **Nota (2026-07-05):** este registro corresponde al build v1.0
+> (PySimpleGUI). Desde la v1.1 la GUI usa CustomTkinter + tkinterdnd2 y el
+> `.exe` aquí descrito quedó obsoleto. Recompilar con el mismo comando de
+> PyInstaller para obtener un `.exe` con las funciones nuevas.
 
 ---
 

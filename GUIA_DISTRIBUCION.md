@@ -1,5 +1,15 @@
 # 📦 Guía de Distribución - MD_to_DOCX.exe
 
+> ⚠️ **Desactualizado (2026-07-05):** este documento registra el build
+> original hecho con PySimpleGUI (v1.0). Desde la v1.1, `app.py` usa
+> CustomTkinter + tkinterdnd2 — el `.exe` en `dist/` es el build viejo y
+> **no incluye** las funciones nuevas (drag-and-drop real, exportar a PDF,
+> temas, batch, watch). Para regenerar el ejecutable actualizado, sigue el
+> mismo comando `pyinstaller --onefile --windowed --name="MD_to_DOCX" app.py`
+> descrito abajo — PyInstaller detectará las nuevas dependencias
+> (`customtkinter`, `tkinterdnd2`) automáticamente. El resto de este
+> documento describe el proceso histórico como referencia.
+
 ## Resumen de Creación del Ejecutable
 
 Esta guía documenta el proceso completo para crear y distribuir el ejecutable `MD_to_DOCX.exe`.
@@ -74,7 +84,7 @@ Resultado Final:
 C:\Users\DANNY\Desktop\Modelo de negocio Web\
 │
 ├── dist/
-│   └── MD_to_DOCX.exe              ← EJECUTABLE PRINCIPAL (~170 MB)
+│   └── MD_to_DOCX.exe              ← EJECUTABLE PRINCIPAL (~17 MB)
 │
 ├── build/                           ← Archivos temporales de compilación
 │   └── MD_to_DOCX/
@@ -103,7 +113,7 @@ C:\Users\DANNY\Desktop\Modelo de negocio Web\
 |-----------|-------|
 | **Nombre** | `MD_to_DOCX.exe` |
 | **Ubicación** | `dist/MD_to_DOCX.exe` |
-| **Tamaño** | ~170 MB (todo incluido) |
+| **Tamaño** | ~17 MB (todo incluido) |
 | **Versión Python** | 3.14.6 |
 | **Arquitectura** | Windows 64-bit Intel |
 | **Bootloader** | runw.exe (sin consola) |
@@ -308,7 +318,7 @@ Modules Included: 500+
 Standard Hooks: 30+
 Third-party Hooks: 5+
 DLLs: Auto-detected and bundled
-Total Size: ~170 MB (uncompressed)
+Total Size: ~17 MB (uncompressed)
 
 Build Status: ✓ SUCCESS
 Warnings: 0
@@ -376,7 +386,7 @@ Antes de distribuir a usuarios:
 - [ ] Enlaces funcionan en documento
 - [ ] Tabla de contenido se genera
 - [ ] Ejecutable es portable (funciona en otra carpeta)
-- [ ] Tamaño es razonable (~170 MB)
+- [ ] Tamaño es razonable (~17 MB)
 - [ ] No requiere Python instalado
 - [ ] Documentación está actualizada
 

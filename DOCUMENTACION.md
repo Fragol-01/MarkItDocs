@@ -19,10 +19,15 @@
 
 ### Características Principales
 
-✅ **Interfaz Gráfica Amigable** - GUI basada en PySimpleGUI  
+✅ **Interfaz Gráfica Moderna** - GUI basada en CustomTkinter con drag-and-drop real  
 ✅ **Conversión Markdown → Word** - Preserva formato y estructura  
+✅ **Conversión Markdown → PDF** - Vía MarkItPDF (Chromium headless), botón dedicado en la GUI  
 ✅ **Soporte para Elementos Complejos** - Tablas, imágenes, enlaces, código  
 ✅ **Tabla de Contenido Automática** - Generada desde encabezados  
+✅ **Salto de Página Manual** - `\pagebreak` o `<!-- pagebreak -->`  
+✅ **Tema Configurable** - Personaliza colores y fuentes vía `.json`/`.toml`  
+✅ **Conversión Batch** - Convierte múltiples archivos con un patrón glob  
+✅ **Modo Watch** - Reconvierte automáticamente al detectar cambios  
 ✅ **Procesamiento Asincrónico** - No bloquea la interfaz  
 ✅ **CLI y GUI** - Úsalo como prefieras  
 ✅ **Aplicación Independiente** - Ejecutable .exe sin requerimientos Python  
@@ -32,7 +37,7 @@
 ## 💻 Requisitos Previos
 
 ### Para ejecutar desde código fuente:
-- **Python 3.10+** (probado en 3.14.6)
+- **Python 3.10+** (probado en 3.14.6; los temas `.toml` requieren 3.11+ por `tomllib` — los temas `.json` funcionan en 3.10)
 - **pip** (gestor de paquetes Python)
 - **Windows 7+** (sistema operativo)
 
@@ -84,8 +89,12 @@ pip install -r requirements.txt
 - `python-docx 1.2.0` - Creación y manipulación de documentos Word
 - `markdown` - Conversión de Markdown a HTML
 - `lxml 6.1.1` - Parseo de HTML
-- `pillow 12.2.0` - Procesamiento de imágenes
-- `PySimpleGUI` - Interfaz gráfica
+- `customtkinter` - Interfaz gráfica moderna
+- `tkinterdnd2` - Drag-and-drop real de archivos
+
+Opcional (para exportar a PDF desde la GUI): el paquete `markitpdf`
+(repo hermano en `C:\Users\DANNY\Desktop\MarkItPDF`) instalado en modo
+editable con `pip install -e .`.
 
 #### Paso 3: Ejecutar la Aplicación
 
@@ -371,7 +380,7 @@ pyinstaller --onefile --windowed --name="MD_to_DOCX" --icon=NONE app.py
 
 ```
 dist/
-└── MD_to_DOCX.exe              ← EJECUTABLE FINAL (~170 MB)
+└── MD_to_DOCX.exe              ← EJECUTABLE FINAL (~41 MB)
 
 build/
 └── MD_to_DOCX/                 ← Archivos de compilación (temporal)
@@ -388,7 +397,7 @@ MD_to_DOCX.spec                 ← Configuración PyInstaller
 | Propiedad | Valor |
 |-----------|-------|
 | Nombre | `MD_to_DOCX.exe` |
-| Tamaño | ~170 MB |
+| Tamaño | ~41 MB |
 | Ubicación | `dist/MD_to_DOCX.exe` |
 | Plataforma | Windows 64-bit |
 | Versión Python | 3.14.6 |
@@ -600,6 +609,19 @@ Para reportar problemas o sugerencias:
 ---
 
 ## 📝 Histórico de Cambios
+
+### Versión 1.1 (2026-07-05)
+- ✅ GUI migrada de PySimpleGUI a CustomTkinter + tkinterdnd2 (drag-and-drop real)
+- ✅ Nuevo botón "Convertir a PDF" (vía repo hermano MarkItPDF)
+- ✅ Soporte de salto de página manual (`\pagebreak`)
+- ✅ Temas de estilos configurables (`.json`/`.toml`)
+- ✅ Conversión batch por patrón glob
+- ✅ Modo watch (reconversión automática al detectar cambios)
+- ✅ Reintentos en descarga de imágenes remotas
+- ✅ Validación de extensión antes de convertir
+- ✅ Logging estructurado con niveles
+- ✅ Tests de humo (self-check) y repo git propio
+- ✅ Eliminada dependencia muerta (`pillow`)
 
 ### Versión 1.0 - Inicial (2026-07-04)
 - ✅ Conversión Markdown → Word
