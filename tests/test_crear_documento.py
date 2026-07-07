@@ -7,8 +7,26 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from crear_documento import convert_many, convert_markdown_file, validate_markdown_extension  # noqa: E402
+from crear_documento import (  # noqa: E402
+    convert_many,
+    convert_markdown_file,
+    convert_merged_from_patterns,
+    convert_source_file,
+    validate_markdown_extension,
+    validate_source_extension,
+)
 from docx import Document  # noqa: E402
+
+SAMPLE_HTML = """<!doctype html>
+<html>
+<head><title>Documento HTML</title></head>
+<body>
+<h1>Título HTML</h1>
+<p>Párrafo con <strong>negrita</strong> y <em>cursiva</em>.</p>
+<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>
+</body>
+</html>
+"""
 
 SAMPLE_MARKDOWN = """# Documento de prueba
 
@@ -107,6 +125,73 @@ def test_convert_many_batch():
         assert all(r.exists() for r in results)
 
 
+def test_html_to_docx():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        html_path = Path(tmp_dir) / "sample.html"
+        html_path.write_text(SAMPLE_HTML, encoding="utf-8")
+
+        output = convert_source_file(html_path)
+
+        assert output.exists() and output.suffix == ".docx"
+        document = Document(output)
+        texts = [p.text for p in document.paragraphs]
+        assert any("Título HTML" in t for t in texts), "El h1 del HTML debe estar en el .docx"
+
+
+def test_html_extension_accepted_md_only_validator_rejects():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        html_path = Path(tmp_dir) / "x.html"
+        html_path.write_text("<p>hola</p>", encoding="utf-8")
+        validate_source_extension(html_path)  # no debe lanzar
+        try:
+            validate_markdown_extension(html_path)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("validate_markdown_extension debe rechazar .html")
+
+
+def test_merged_docx_preserves_order_and_page_breaks():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        (Path(tmp_dir) / "01_intro.md").write_text("# Introducción\ncontenido uno\n", encoding="utf-8")
+        (Path(tmp_dir) / "02_medio.html").write_text("<h1>Medio</h1><p>contenido dos</p>", encoding="utf-8")
+        (Path(tmp_dir) / "03_fin.md").write_text("# Final\ncontenido tres\n", encoding="utf-8")
+
+        output = Path(tmp_dir) / "unido.docx"
+        result = convert_merged_from_patterns(
+            [
+                str(Path(tmp_dir) / "01_intro.md"),
+                str(Path(tmp_dir) / "02_medio.html"),
+                str(Path(tmp_dir) / "03_fin.md"),
+            ],
+            output,
+        )
+
+        assert result.exists()
+        document = Document(result)
+        texts = [p.text for p in document.paragraphs if p.text.strip()]
+        idx_intro = next(i for i, t in enumerate(texts) if "Introducción" in t)
+        idx_medio = next(i for i, t in enumerate(texts) if "Medio" in t)
+        idx_fin = next(i for i, t in enumerate(texts) if "Final" in t)
+        assert idx_intro < idx_medio < idx_fin, "El orden de los archivos debe conservarse"
+
+        xml = document.element.xml
+        assert xml.count('type="page"') >= 2, "Debe haber salto de página entre cada archivo"
+
+
+def test_yaml_theme_loads():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        md_path = Path(tmp_dir) / "sample.md"
+        md_path.write_text(SAMPLE_MARKDOWN, encoding="utf-8")
+
+        theme_path = Path(tmp_dir) / "theme.yaml"
+        theme_path.write_text("body_font: Verdana\ntitle_color: [10, 100, 200]\n", encoding="utf-8")
+
+        output = convert_markdown_file(md_path, theme_path=theme_path)
+        document = Document(output)
+        assert document.styles["Normal"].font.name == "Verdana"
+
+
 if __name__ == "__main__":
     test_convert_produces_nonempty_docx()
     print("OK: test_convert_produces_nonempty_docx")
@@ -120,4 +205,12 @@ if __name__ == "__main__":
     print("OK: test_custom_theme_overrides_defaults")
     test_convert_many_batch()
     print("OK: test_convert_many_batch")
+    test_html_to_docx()
+    print("OK: test_html_to_docx")
+    test_html_extension_accepted_md_only_validator_rejects()
+    print("OK: test_html_extension_accepted_md_only_validator_rejects")
+    test_merged_docx_preserves_order_and_page_breaks()
+    print("OK: test_merged_docx_preserves_order_and_page_breaks")
+    test_yaml_theme_loads()
+    print("OK: test_yaml_theme_loads")
     print("Todos los self-checks pasaron.")

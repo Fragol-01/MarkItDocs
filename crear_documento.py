@@ -36,6 +36,8 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 MARKDOWN_EXTENSIONS = {".md", ".markdown"}
+HTML_EXTENSIONS = {".html", ".htm"}
+SUPPORTED_EXTENSIONS = MARKDOWN_EXTENSIONS | HTML_EXTENSIONS
 
 DEFAULT_THEME = {
     "body_font": "Calibri",
@@ -116,7 +118,7 @@ def color_to_hex(color: RGBColor) -> str:
 
 
 def load_theme(theme_path: Path | None) -> dict:
-    """Carga un tema de estilos desde un .toml/.json, o usa el tema por defecto."""
+    """Carga un tema de estilos desde un .json/.toml/.yaml/.yml, o usa el tema por defecto."""
     if theme_path is None:
         return dict(DEFAULT_THEME)
 
@@ -124,14 +126,28 @@ def load_theme(theme_path: Path | None) -> dict:
     if not theme_path.exists():
         raise FileNotFoundError(f"No existe el archivo de tema: {theme_path}")
 
-    if theme_path.suffix == ".json":
+    suffix = theme_path.suffix.lower()
+    if suffix == ".json":
         overrides = json.loads(theme_path.read_text(encoding="utf-8"))
-    elif theme_path.suffix == ".toml":
+    elif suffix == ".toml":
         if tomllib is None:
             raise RuntimeError("Se requiere Python 3.11+ para leer temas .toml")
         overrides = tomllib.loads(theme_path.read_text(encoding="utf-8"))
+    elif suffix in {".yaml", ".yml"}:
+        try:
+            import yaml  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError(
+                f"Para cargar {theme_path.name} instala PyYAML: pip install pyyaml"
+            ) from exc
+        overrides = yaml.safe_load(theme_path.read_text(encoding="utf-8"))
     else:
-        raise ValueError(f"Formato de tema no soportado: {theme_path.suffix} (usa .json o .toml)")
+        raise ValueError(
+            f"Formato de tema no soportado: {theme_path.suffix} (usa .json/.toml/.yaml/.yml)"
+        )
+
+    if not isinstance(overrides, dict):
+        raise ValueError(f"El tema {theme_path.name} debe contener un objeto/mapping en la raíz.")
 
     theme = dict(DEFAULT_THEME)
     theme.update(overrides)
@@ -376,6 +392,24 @@ class MarkdownToDocxConverter:
         self.bookmark_id = 1
 
     def convert(self, markdown_text: str) -> Document:
+        return self.convert_markdown(markdown_text)
+
+    def convert_html(self, html_text: str) -> Document:
+        """Convierte contenido HTML (documento completo o fragmento) a .docx."""
+        # Si trae <body>, nos quedamos con su interior; si no, lo usamos tal cual.
+        body_match = re.search(r"<body[^>]*>(.*)</body>", html_text, re.IGNORECASE | re.DOTALL)
+        body = body_match.group(1) if body_match else html_text
+        # Dividimos por hr.__pagebreak__ para soportar saltos de página manuales
+        # (insertamos esta clase en HTML a través de un comentario o un <hr>).
+        parts = re.split(r'<hr[^>]*class="__pagebreak__"[^>]*>', body, flags=re.IGNORECASE)
+        combined = '<hr class="__pagebreak__">'.join(parts)
+        root = lxml_html.fromstring(f"<div>{combined}</div>")
+        self._build_anchor_map(root)
+        self._render_toc_if_requested_html(root, html_text)
+        self._render_container(root)
+        return self.document
+
+    def convert_markdown(self, markdown_text: str) -> Document:
         segments = PAGE_BREAK_PATTERN.split(markdown_text)
         html_segments = [markdown_to_html(segment) for segment in segments]
         combined_html = "<hr class=\"__pagebreak__\">".join(html_segments)
@@ -384,6 +418,16 @@ class MarkdownToDocxConverter:
         self._render_toc_if_requested(markdown_text)
         self._render_container(root)
         return self.document
+
+    def _render_toc_if_requested_html(self, root, html_text: str) -> None:
+        if not TOC_PATTERN.search(html_text):
+            return
+        title = self.document.add_paragraph()
+        title.style = "Heading 1"
+        title.add_run("Tabla de contenido")
+        title.runs[0].font.color.rgb = self.title_color
+        toc = self.document.add_paragraph()
+        add_toc_field(toc)
 
     def _build_anchor_map(self, root) -> None:
         for node in root.iterdescendants():
@@ -659,27 +703,89 @@ def validate_markdown_extension(source_path: Path) -> None:
         )
 
 
-def convert_markdown_file(
+def validate_source_extension(source_path: Path) -> None:
+    """Valida que la extensión sea Markdown o HTML."""
+    if source_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        allowed = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+        raise ValueError(
+            f"'{source_path.name}' no tiene una extensión soportada ({allowed}). "
+            "Usa archivos .md, .markdown, .html o .htm."
+        )
+
+
+def _source_to_html_body(source_path: Path) -> str:
+    """Lee un archivo .md o .html y devuelve el HTML del body listo para combinar."""
+    text = source_path.read_text(encoding="utf-8")
+    if source_path.suffix.lower() in HTML_EXTENSIONS:
+        body_match = re.search(r"<body[^>]*>(.*)</body>", text, re.IGNORECASE | re.DOTALL)
+        return body_match.group(1) if body_match else text
+    return markdown_to_html(text)
+
+
+def convert_source_to_docx(
+    source_path: Path,
+    output_path: Path,
+    theme: dict | None = None,
+) -> Document:
+    """Convierte un .md/.html a un Document de python-docx (sin guardar)."""
+    text = source_path.read_text(encoding="utf-8")
+    converter = MarkdownToDocxConverter(source_path, output_path, theme=theme)
+    if source_path.suffix.lower() in HTML_EXTENSIONS:
+        return converter.convert_html(text)
+    return converter.convert_markdown(text)
+
+
+def convert_source_file(
     source_path: Path,
     output_path: Path | None = None,
     theme_path: Path | None = None,
 ) -> Path:
+    """Convierte un .md o .html a un .docx y lo guarda en disco."""
     source_path = Path(source_path).resolve()
     if not source_path.exists():
         raise FileNotFoundError(f"No existe el archivo de entrada: {source_path}")
-    validate_markdown_extension(source_path)
+    validate_source_extension(source_path)
 
     if output_path is None:
         output_path = source_path.with_suffix(".docx")
     output_path = Path(output_path).resolve()
 
     theme = load_theme(theme_path)
-    markdown_text = source_path.read_text(encoding="utf-8")
-    converter = MarkdownToDocxConverter(source_path, output_path, theme=theme)
-    document = converter.convert(markdown_text)
+    document = convert_source_to_docx(source_path, output_path, theme=theme)
     document.save(output_path)
     logger.info("Documento creado: %s", output_path)
     return output_path
+
+
+def convert_markdown_file(
+    source_path: Path,
+    output_path: Path | None = None,
+    theme_path: Path | None = None,
+) -> Path:
+    """Compatibilidad hacia atrás: alias de convert_source_file()."""
+    return convert_source_file(source_path, output_path, theme_path)
+
+
+def _expand_patterns(patterns: list[str]) -> list[Path]:
+    """Resuelve una mezcla de rutas literales y patrones glob a una lista única de archivos."""
+    seen: set[Path] = set()
+    resolved: list[Path] = []
+    for pattern in patterns:
+        pattern_path = Path(pattern)
+        if pattern_path.exists() and pattern_path.is_file():
+            target = pattern_path.resolve()
+        else:
+            matches = sorted(Path(p).resolve() for p in glob.glob(pattern))
+            target = None
+            for m in matches:
+                if m.is_file() and m not in seen:
+                    seen.add(m)
+                    resolved.append(m)
+            continue
+        if target not in seen:
+            seen.add(target)
+            resolved.append(target)
+    return resolved
 
 
 def convert_many(
@@ -687,23 +793,15 @@ def convert_many(
     output_dir: Path | None = None,
     theme_path: Path | None = None,
 ) -> list[Path]:
-    """Convierte múltiples archivos .md que coincidan con los patrones glob dados."""
-    source_paths: list[Path] = []
-    for pattern in patterns:
-        pattern_path = Path(pattern)
-        if pattern_path.exists() and pattern_path.is_file():
-            source_paths.append(pattern_path)
-        else:
-            matches = sorted(Path(p) for p in glob.glob(pattern))
-            source_paths.extend(m for m in matches if m.is_file())
-
+    """Convierte múltiples archivos .md/.html (literales o glob) en .docx separados."""
+    source_paths = _expand_patterns(patterns)
     if not source_paths:
         raise FileNotFoundError(f"Ningún archivo coincide con los patrones: {patterns}")
 
-    results = []
+    results: list[Path] = []
     for source_path in source_paths:
         try:
-            validate_markdown_extension(source_path)
+            validate_source_extension(source_path)
         except ValueError as exc:
             logger.warning("Omitiendo %s: %s", source_path, exc)
             continue
@@ -712,14 +810,103 @@ def convert_many(
         if output_dir is not None:
             output_path = Path(output_dir) / source_path.with_suffix(".docx").name
 
-        result = convert_markdown_file(source_path, output_path, theme_path=theme_path)
+        result = convert_source_file(source_path, output_path, theme_path=theme_path)
         results.append(result)
 
     return results
 
 
+def convert_merged_docx(
+    source_paths: list[Path],
+    output_path: Path,
+    theme: dict | None = None,
+) -> Path:
+    """Une varios .md/.html en un único .docx, en el orden recibido.
+
+    Cada archivo ocupa su propio bloque con salto de página entre ellos. Los
+    marcadores ``<!-- pagebreak -->`` dentro de un mismo archivo también se
+    respetan (esa lógica ya vive en ``MarkdownToDocxConverter.convert_markdown``).
+    """
+    if not source_paths:
+        raise ValueError("convert_merged_docx requiere al menos un archivo de entrada.")
+
+    output_path = Path(output_path).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if theme is None:
+        theme = dict(DEFAULT_THEME)
+
+    first = Path(source_paths[0]).resolve()
+    document = Document()
+    configure_document(document, theme)
+
+    for index, raw in enumerate(source_paths):
+        path = Path(raw).resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"No existe el archivo de entrada: {path}")
+        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            allowed = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+            raise ValueError(f"'{path.name}' no es una entrada soportada ({allowed}).")
+
+        # Construimos un converter "temporal" que reusa el mismo Document
+        # para que el primer archivo no pierda el formato base.
+        if index == 0:
+            converter = MarkdownToDocxConverter(path, output_path, theme=theme)
+            converter.document = document  # reutilizamos el doc recién creado
+            if path.suffix.lower() in HTML_EXTENSIONS:
+                converter.convert_html(path.read_text(encoding="utf-8"))
+            else:
+                converter.convert_markdown(path.read_text(encoding="utf-8"))
+        else:
+            # Para los siguientes, partimos de cero y luego movemos todos los
+            # elementos del body al documento principal.
+            sub_converter = MarkdownToDocxConverter(path, output_path, theme=theme)
+            if path.suffix.lower() in HTML_EXTENSIONS:
+                sub_converter.convert_html(path.read_text(encoding="utf-8"))
+            else:
+                sub_converter.convert_markdown(path.read_text(encoding="utf-8"))
+
+            # Salto de página entre archivos
+            document.add_page_break()
+            _merge_documents(document, sub_converter.document)
+
+    document.save(output_path)
+    logger.info("Documento unificado creado: %s", output_path)
+    return output_path
+
+
+def _merge_documents(target: Document, source: Document) -> None:
+    """Copia los elementos de body de ``source`` al final de ``target`` (sin la sectPr final)."""
+    from copy import deepcopy
+
+    src_body = source.element.body
+    target_body = target.element.body
+    # Conservamos el último elemento de ``target_body`` (la sectPr del documento)
+    # y añadimos todos los hijos de ``src_body`` antes de él.
+    sectPr = target_body.find(qn("w:sectPr"))
+    for child in list(src_body):
+        if child.tag == qn("w:sectPr"):
+            continue
+        target_body.insert(list(target_body).index(sectPr) if sectPr is not None else len(target_body), deepcopy(child))
+
+
+def convert_merged_from_patterns(
+    patterns: list[str],
+    output_path: Path,
+    theme_path: Path | None = None,
+) -> Path:
+    """Atajo: resuelve patrones/glob y une todos los .md/.html en un solo .docx."""
+    source_paths = _expand_patterns(patterns)
+    if not source_paths:
+        raise FileNotFoundError(f"Ningún archivo coincide con los patrones: {patterns}")
+    for path in source_paths:
+        validate_source_extension(path)
+    theme = load_theme(theme_path)
+    return convert_merged_docx(source_paths, output_path, theme=theme)
+
+
 def watch_and_convert(source_path: Path, output_path: Path | None, theme_path: Path | None) -> None:
-    """Vigila un archivo .md y reconvierte automáticamente cada vez que cambia."""
+    """Vigila un archivo y reconvierte automáticamente cada vez que cambia."""
     source_path = Path(source_path).resolve()
     last_mtime: float | None = None
     logger.info("Modo watch activo sobre %s (Ctrl+C para detener)", source_path)
@@ -732,7 +919,7 @@ def watch_and_convert(source_path: Path, output_path: Path | None, theme_path: P
             if mtime != last_mtime:
                 last_mtime = mtime
                 try:
-                    convert_markdown_file(source_path, output_path, theme_path=theme_path)
+                    convert_source_file(source_path, output_path, theme_path=theme_path)
                 except Exception as exc:
                     logger.error("Falló la reconversión: %s", exc)
             time.sleep(1)
@@ -741,11 +928,29 @@ def watch_and_convert(source_path: Path, output_path: Path | None, theme_path: P
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Convierte uno o más archivos Markdown a Word con formato conservado.")
-    parser.add_argument("input", nargs="+", help="Ruta(s) o patrón(es) glob de archivo(s) .md de entrada")
-    parser.add_argument("-o", "--output", help="Ruta de salida .docx (un solo archivo) o carpeta de salida (batch)")
-    parser.add_argument("--theme", help="Ruta a un archivo de tema .json o .toml")
-    parser.add_argument("--watch", action="store_true", help="Vigila el archivo de entrada y reconvierte al detectar cambios (solo un archivo)")
+    parser = argparse.ArgumentParser(
+        description="Convierte uno o más archivos Markdown/HTML a Word (.docx) con formato conservado."
+    )
+    parser.add_argument(
+        "input", nargs="+",
+        help="Ruta(s) o patrón(es) glob de archivo(s) .md/.markdown/.html/.htm de entrada",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        help="Ruta de salida .docx (un solo archivo) o carpeta de salida (batch)",
+    )
+    parser.add_argument(
+        "--theme",
+        help="Ruta a un archivo de tema .json/.toml/.yaml/.yml",
+    )
+    parser.add_argument(
+        "--merge", action="store_true",
+        help="Une todos los archivos de entrada en un único .docx (en orden)",
+    )
+    parser.add_argument(
+        "--watch", action="store_true",
+        help="Vigila el archivo de entrada y reconvierte al detectar cambios (solo un archivo)",
+    )
     return parser
 
 
@@ -763,9 +968,15 @@ def main(argv: list[str] | None = None) -> int:
             watch_and_convert(Path(args.input[0]), Path(args.output) if args.output else None, theme_path)
             return 0
 
+        if args.merge:
+            output = Path(args.output) if args.output else Path("merged.docx").resolve()
+            result = convert_merged_from_patterns(args.input, output, theme_path=theme_path)
+            print(f"Documento unificado creado: {result}")
+            return 0
+
         if len(args.input) == 1 and Path(args.input[0]).exists() and Path(args.input[0]).is_file():
             output_path = Path(args.output) if args.output else None
-            result = convert_markdown_file(Path(args.input[0]), output_path, theme_path=theme_path)
+            result = convert_source_file(Path(args.input[0]), output_path, theme_path=theme_path)
             print(f"Documento creado: {result}")
             return 0
 

@@ -3,6 +3,20 @@ __pycache__/
 .venv/
 build/
 dist/
-*.spec
 *.docx
 !tests/fixtures/*.docx
+*.pdf
+
+# Documentos personales / de negocio (nunca al repo público)
+MODELO_NEGOCIO_DESARROLLO_WEB.*
+prueba_salida.*
+
+# Artefactos de sesiones de trabajo locales
+AUDITORIA.md
+DOCUMENTACION.md
+GUIA_DISTRIBUCION.md
+GUIA_RAPIDA.md
+INDICE.md
+PROCESO_EMPAQUETADO.md
+RESUMEN_FINAL.txt
+icon_base64.txt

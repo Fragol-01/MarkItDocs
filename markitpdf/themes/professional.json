@@ -1,0 +1,36 @@
+{
+  "name": "Professional",
+  "description": "Tema corporativo con paleta azul marino y tipografía Segoe UI. Ideal para documentos técnicos y de negocio.",
+  "version": "1.0.0",
+  "css": "professional.css",
+  "fonts": {
+    "body": "Segoe UI",
+    "heading": "Segoe UI Semibold",
+    "code": "Cascadia Code"
+  },
+  "colors": {
+    "title": "#1F4E79",
+    "text": "#1F2937",
+    "link": "#0066CC",
+    "rule": "#B4BECE",
+    "code_fill": "#F6F8FA",
+    "quote_fill": "#F8F9FA",
+    "table_head_fill": "#D9EAF7"
+  },
+  "sizes": {
+    "body_pt": 10.5,
+    "h1_pt": 22,
+    "h2_pt": 15,
+    "h3_pt": 12.5,
+    "h4_pt": 11,
+    "h5_pt": 10.5,
+    "h6_pt": 10
+  },
+  "page": {
+    "size": "A4",
+    "margin_top_cm": 2.2,
+    "margin_right_cm": 1.8,
+    "margin_bottom_cm": 2.4,
+    "margin_left_cm": 1.8
+  }
+}

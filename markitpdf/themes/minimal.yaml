@@ -1,0 +1,36 @@
+name: Minimal
+description: >-
+  Tema limpio y espaciado con tipografía Inter y paleta neutra.
+  Ideal para contenido editorial o documentación moderna.
+version: 1.0.0
+css: minimal.css
+
+fonts:
+  body: Inter
+  heading: Inter
+  code: JetBrains Mono
+
+colors:
+  title: "#0F172A"
+  text: "#1F2937"
+  link: "#2563EB"
+  rule: "#E2E8F0"
+  code_fill: "#F1F5F9"
+  quote_fill: "#F8FAFC"
+  table_head_fill: "#F8FAFC"
+
+sizes:
+  body_pt: 11
+  h1_pt: 24
+  h2_pt: 16
+  h3_pt: 13
+  h4_pt: 11.5
+  h5_pt: 10.8
+  h6_pt: 10
+
+page:
+  size: A4
+  margin_top_cm: 2.5
+  margin_right_cm: 2.0
+  margin_bottom_cm: 2.5
+  margin_left_cm: 2.0
