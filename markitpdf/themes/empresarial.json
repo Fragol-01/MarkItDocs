@@ -1,0 +1,36 @@
+{
+  "name": "Empresarial",
+  "description": "Ejecutivo formal: serif Georgia, gris carbón con acentos burdeos y dorado. Para propuestas comerciales y documentos de dirección.",
+  "version": "1.0.0",
+  "css": "empresarial.css",
+  "fonts": {
+    "body": "Constantia",
+    "heading": "Georgia",
+    "code": "Consolas"
+  },
+  "colors": {
+    "title": "#7B2D3B",
+    "text": "#2B2F33",
+    "link": "#7B2D3B",
+    "rule": "#B08D57",
+    "code_fill": "#F5F3EF",
+    "quote_fill": "#F7F5F1",
+    "table_head_fill": "#E4DED2"
+  },
+  "sizes": {
+    "body_pt": 10.5,
+    "h1_pt": 21,
+    "h2_pt": 14.5,
+    "h3_pt": 12,
+    "h4_pt": 11,
+    "h5_pt": 10.5,
+    "h6_pt": 10
+  },
+  "page": {
+    "size": "A4",
+    "margin_top_cm": 2.4,
+    "margin_right_cm": 2,
+    "margin_bottom_cm": 2.6,
+    "margin_left_cm": 2
+  }
+}

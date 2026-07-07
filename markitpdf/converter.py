@@ -54,6 +54,11 @@ class ConversionResult:
     source_count: int = 1
 
 
+def _hex_to_rgb_list(hex_color: str) -> list[int]:
+    h = hex_color.lstrip("#")
+    return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+
+
 @dataclass(frozen=True)
 class ThemeMetadata:
     """Metadatos estructurados de un tema (cargados desde .json o .yaml opcional)."""
@@ -84,6 +89,42 @@ class ThemeMetadata:
                 lines.append(f"  --theme-page-{key}: {value};")
         lines.append("}")
         return "\n".join(lines)
+
+    def to_docx_theme(self) -> dict:
+        """Traduce la metadata a los campos que entiende el motor DOCX.
+
+        Devuelve solo las claves presentes; el llamador las fusiona sobre su
+        tema por defecto. Colores de texto como [r, g, b]; rellenos como hex
+        sin '#'.
+        """
+        theme: dict = {}
+        if self.fonts.get("body"):
+            theme["body_font"] = self.fonts["body"]
+        if self.fonts.get("code"):
+            theme["code_font"] = self.fonts["code"]
+        if self.colors.get("title"):
+            theme["title_color"] = _hex_to_rgb_list(self.colors["title"])
+        if self.colors.get("link"):
+            theme["link_color"] = _hex_to_rgb_list(self.colors["link"])
+        if self.colors.get("rule"):
+            theme["hr_color"] = _hex_to_rgb_list(self.colors["rule"])
+        for meta_key, docx_key in (
+            ("quote_fill", "quote_fill"),
+            ("table_head_fill", "table_head_fill"),
+            ("code_fill", "code_fill"),
+        ):
+            if self.colors.get(meta_key):
+                theme[docx_key] = self.colors[meta_key].lstrip("#").upper()
+        return theme
+
+
+def get_theme_metadata(theme_name: str) -> ThemeMetadata:
+    """API pública: metadata de un tema integrado (para GUI y motor DOCX)."""
+    if theme_name not in available_themes():
+        raise ValueError(
+            f"Tema '{theme_name}' no existe. Temas disponibles: {', '.join(available_themes())}"
+        )
+    return _load_theme_metadata(theme_name)
 
 
 def _load_theme_metadata(theme_name: str) -> ThemeMetadata:
@@ -131,9 +172,38 @@ def _load_theme_css(theme: str) -> str:
     return (THEMES_DIR / f"{theme}.css").read_text(encoding="utf-8")
 
 
+# Una fila de tabla pipe y su separador de cabecera (| :--- | --- |)
+_TABLE_ROW_RE = re.compile(r"^\s{0,3}\|.*\|\s*$")
+_TABLE_SEP_RE = re.compile(r"^\s{0,3}\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*\|?\s*$")
+
+
+def _normalize_table_blank_lines(markdown_text: str) -> str:
+    """Garantiza la línea en blanco que python-markdown exige antes de una tabla.
+
+    (Duplicado a propósito en crear_documento.py — motores independientes.)
+    """
+    lines = markdown_text.splitlines()
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        if (
+            _TABLE_ROW_RE.match(line)
+            and i + 1 < len(lines)
+            and _TABLE_SEP_RE.match(lines[i + 1])
+            and out
+            and out[-1].strip()
+            and not _TABLE_ROW_RE.match(out[-1])
+        ):
+            out.append("")
+        out.append(line)
+    result = "\n".join(out)
+    if markdown_text.endswith("\n") and not result.endswith("\n"):
+        result += "\n"
+    return result
+
+
 def _markdown_to_html_body(markdown_text: str) -> str:
     return markdown_lib.markdown(
-        markdown_text,
+        _normalize_table_blank_lines(markdown_text),
         extensions=["extra", "tables", "fenced_code", "attr_list", "sane_lists", "toc", "codehilite"],
         extension_configs={"codehilite": {"noclasses": True}},
         output_format="html5",

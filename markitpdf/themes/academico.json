@@ -1,0 +1,36 @@
+{
+  "name": "Académico",
+  "description": "Estilo paper: Times New Roman, interlineado amplio, texto justificado y tablas booktabs. Para artículos, tesis e informes académicos.",
+  "version": "1.0.0",
+  "css": "academico.css",
+  "fonts": {
+    "body": "Times New Roman",
+    "heading": "Times New Roman",
+    "code": "Courier New"
+  },
+  "colors": {
+    "title": "#1A1A2E",
+    "text": "#1A1A2E",
+    "link": "#14346B",
+    "rule": "#9A9AAE",
+    "code_fill": "#F4F4F6",
+    "quote_fill": "#FFFFFF",
+    "table_head_fill": "#EDEDF2"
+  },
+  "sizes": {
+    "body_pt": 11,
+    "h1_pt": 18,
+    "h2_pt": 13.5,
+    "h3_pt": 12,
+    "h4_pt": 11,
+    "h5_pt": 11,
+    "h6_pt": 10.5
+  },
+  "page": {
+    "size": "A4",
+    "margin_top_cm": 2.5,
+    "margin_right_cm": 2.5,
+    "margin_bottom_cm": 2.7,
+    "margin_left_cm": 2.5
+  }
+}

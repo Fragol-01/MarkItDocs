@@ -117,13 +117,34 @@ def color_to_hex(color: RGBColor) -> str:
     return f"{color[0]:02X}{color[1]:02X}{color[2]:02X}"
 
 
-def load_theme(theme_path: Path | None) -> dict:
-    """Carga un tema de estilos desde un .json/.toml/.yaml/.yml, o usa el tema por defecto."""
+def load_theme(theme_path: str | Path | None) -> dict:
+    """Carga un tema de estilos.
+
+    Acepta:
+    - ``None`` → tema por defecto
+    - Nombre de tema integrado (``professional``, ``academico``, …) → usa la
+      metadata JSON/YAML del subpaquete markitpdf, así el mismo tema viste
+      tanto el PDF como el Word.
+    - Ruta a un archivo ``.json``/``.toml``/``.yaml``/``.yml`` con overrides.
+    """
     if theme_path is None:
         return dict(DEFAULT_THEME)
 
     theme_path = Path(theme_path)
     if not theme_path.exists():
+        # ¿Es el nombre de un tema integrado en vez de una ruta?
+        name = str(theme_path)
+        if "/" not in name and "\\" not in name and not theme_path.suffix:
+            from markitpdf.converter import available_themes, get_theme_metadata
+
+            if name in available_themes():
+                theme = dict(DEFAULT_THEME)
+                theme.update(get_theme_metadata(name).to_docx_theme())
+                return theme
+            raise ValueError(
+                f"Tema '{name}' no reconocido. Integrados: {', '.join(available_themes())}, "
+                "o pasa la ruta de un archivo .json/.toml/.yaml"
+            )
         raise FileNotFoundError(f"No existe el archivo de tema: {theme_path}")
 
     suffix = theme_path.suffix.lower()
@@ -294,9 +315,42 @@ def add_toc_field(paragraph, start_level: int = 1, end_level: int = 3) -> None:
     run._r.append(end)
 
 
+# Una fila de tabla pipe y su separador de cabecera (| :--- | --- |)
+_TABLE_ROW_RE = re.compile(r"^\s{0,3}\|.*\|\s*$")
+_TABLE_SEP_RE = re.compile(r"^\s{0,3}\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*\|?\s*$")
+
+
+def normalize_table_blank_lines(markdown_text: str) -> str:
+    """Inserta la línea en blanco que python-markdown exige antes de una tabla.
+
+    Mucha gente escribe la tabla pegada al párrafo anterior (GitHub y VS Code
+    la renderizan igual), pero la extensión 'tables' la ignora en silencio.
+    Detectamos "fila | separador" y garantizamos la línea en blanco previa.
+    (Duplicado a propósito en markitpdf/converter.py: los dos motores son
+    independientes y no queremos acoplarlos por 15 líneas.)
+    """
+    lines = markdown_text.splitlines()
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        if (
+            _TABLE_ROW_RE.match(line)
+            and i + 1 < len(lines)
+            and _TABLE_SEP_RE.match(lines[i + 1])
+            and out
+            and out[-1].strip()
+            and not _TABLE_ROW_RE.match(out[-1])
+        ):
+            out.append("")
+        out.append(line)
+    result = "\n".join(out)
+    if markdown_text.endswith("\n") and not result.endswith("\n"):
+        result += "\n"
+    return result
+
+
 def markdown_to_html(markdown_text: str) -> str:
     return markdown_lib.markdown(
-        markdown_text,
+        normalize_table_blank_lines(markdown_text),
         extensions=["extra", "tables", "fenced_code", "attr_list", "sane_lists", "toc"],
         output_format="html5",
     )
@@ -713,6 +767,47 @@ def validate_source_extension(source_path: Path) -> None:
         )
 
 
+def detect_inline_tables(markdown_text: str) -> list[int]:
+    """Devuelve los números de línea (1-based) donde una tabla empieza sin línea en blanco antes.
+
+    Markdown requiere una línea en blanco entre un párrafo y una tabla; si no, el motor
+    trata la tabla como continuación del párrafo y no la renderiza como tabla. Esta función
+    es solo diagnóstico: NO modifica el texto, solo avisa al usuario para que lo arregle.
+    """
+    issues: list[int] = []
+    lines = markdown_text.split("\n")
+    for i, line in enumerate(lines):
+        if not line.lstrip().startswith("|"):
+            continue
+        if i == 0:
+            continue
+        prev = lines[i - 1]
+        if prev.strip() == "":
+            continue
+        if prev.lstrip().startswith("|"):
+            continue
+        issues.append(i + 1)
+    return issues
+
+
+def warn_inline_tables(source_path: Path, markdown_text: str) -> None:
+    """Emite una advertencia por cada tabla 'inline' encontrada en el .md."""
+    bad_lines = detect_inline_tables(markdown_text)
+    if not bad_lines:
+        return
+    plural = "s" if len(bad_lines) > 1 else ""
+    logger.warning(
+        "⚠ %s contiene %d tabla%s sin línea en blanco antes "
+        "(línea%s %s). Esas tablas se renderizarán como texto plano, no como tabla. "
+        "Añade una línea en blanco justo antes de cada '| ... |' para corregirlo.",
+        source_path.name,
+        len(bad_lines),
+        plural,
+        plural,
+        ", ".join(str(n) for n in bad_lines),
+    )
+
+
 def _source_to_html_body(source_path: Path) -> str:
     """Lee un archivo .md o .html y devuelve el HTML del body listo para combinar."""
     text = source_path.read_text(encoding="utf-8")
@@ -729,6 +824,8 @@ def convert_source_to_docx(
 ) -> Document:
     """Convierte un .md/.html a un Document de python-docx (sin guardar)."""
     text = source_path.read_text(encoding="utf-8")
+    if source_path.suffix.lower() in MARKDOWN_EXTENSIONS:
+        warn_inline_tables(source_path, text)
     converter = MarkdownToDocxConverter(source_path, output_path, theme=theme)
     if source_path.suffix.lower() in HTML_EXTENSIONS:
         return converter.convert_html(text)
@@ -848,6 +945,9 @@ def convert_merged_docx(
             allowed = ", ".join(sorted(SUPPORTED_EXTENSIONS))
             raise ValueError(f"'{path.name}' no es una entrada soportada ({allowed}).")
 
+        if path.suffix.lower() in MARKDOWN_EXTENSIONS:
+            warn_inline_tables(path, path.read_text(encoding="utf-8"))
+
         # Construimos un converter "temporal" que reusa el mismo Document
         # para que el primer archivo no pierda el formato base.
         if index == 0:
@@ -941,7 +1041,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--theme",
-        help="Ruta a un archivo de tema .json/.toml/.yaml/.yml",
+        help=(
+            "Nombre de tema integrado (professional, minimal, empresarial, "
+            "academico, economico, explicativo) o ruta a un archivo "
+            ".json/.toml/.yaml con overrides"
+        ),
     )
     parser.add_argument(
         "--merge", action="store_true",

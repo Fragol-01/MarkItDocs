@@ -179,6 +179,30 @@ def test_merged_docx_preserves_order_and_page_breaks():
         assert xml.count('type="page"') >= 2, "Debe haber salto de página entre cada archivo"
 
 
+def test_load_theme_by_builtin_name():
+    theme = __import__("crear_documento").load_theme("academico")
+    assert theme["body_font"] == "Times New Roman"
+    assert theme["title_color"] == [26, 26, 46]
+    assert "#" not in theme["table_head_fill"]
+
+    try:
+        __import__("crear_documento").load_theme("tema_inexistente")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Se esperaba ValueError para tema integrado inexistente")
+
+
+def test_table_without_preceding_blank_line_renders():
+    md = "Texto pegado a la tabla:\n| A | B |\n| :--- | :--- |\n| 1 | 2 |\n"
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        md_path = Path(tmp_dir) / "t.md"
+        md_path.write_text(md, encoding="utf-8")
+        output = convert_markdown_file(md_path)
+        document = Document(output)
+        assert len(document.tables) == 1, "La tabla sin línea en blanco previa debe renderizarse"
+
+
 def test_yaml_theme_loads():
     with tempfile.TemporaryDirectory() as tmp_dir:
         md_path = Path(tmp_dir) / "sample.md"
@@ -213,4 +237,8 @@ if __name__ == "__main__":
     print("OK: test_merged_docx_preserves_order_and_page_breaks")
     test_yaml_theme_loads()
     print("OK: test_yaml_theme_loads")
+    test_load_theme_by_builtin_name()
+    print("OK: test_load_theme_by_builtin_name")
+    test_table_without_preceding_blank_line_renders()
+    print("OK: test_table_without_preceding_blank_line_renders")
     print("Todos los self-checks pasaron.")

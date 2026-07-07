@@ -1,0 +1,36 @@
+name: Económico
+description: >-
+  Informes financieros: denso y eficiente, tablas protagonistas con
+  cabecera esmeralda, máximo contenido por página.
+version: 1.0.0
+css: economico.css
+
+fonts:
+  body: Segoe UI
+  heading: Segoe UI Semibold
+  code: Consolas
+
+colors:
+  title: "#0B6E4F"
+  text: "#1E2B26"
+  link: "#0B6E4F"
+  rule: "#9DB8AC"
+  code_fill: "#F2F7F4"
+  quote_fill: "#F2F7F4"
+  table_head_fill: "#CDE5DA"
+
+sizes:
+  body_pt: 9.5
+  h1_pt: 17
+  h2_pt: 12.5
+  h3_pt: 11
+  h4_pt: 10
+  h5_pt: 9.5
+  h6_pt: 9
+
+page:
+  size: A4
+  margin_top_cm: 1.7
+  margin_right_cm: 1.5
+  margin_bottom_cm: 1.9
+  margin_left_cm: 1.5

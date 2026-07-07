@@ -13,10 +13,9 @@
 - **Dos modos de conversión**:
   - *Separado*: N archivos de entrada → N documentos de salida
   - *Unido*: N archivos de entrada → **1 solo documento**, en orden, con salto de página entre cada archivo
-- **Temas**:
-  - PDF: temas CSS de imprenta (`professional`, `minimal`) con metadata en JSON/YAML
-  - DOCX: temas configurables por archivo `.json` / `.yaml` / `.toml` (fuentes, colores, rellenos)
-- **GUI de escritorio** (CustomTkinter): drag-and-drop real, selector de tema, modo unir, log en vivo
+- **6 temas integrados que visten Word Y PDF a la vez**: `professional`, `minimal`, `empresarial`, `academico`, `economico`, `explicativo` — un solo selector, tú decides el formato de salida
+- Temas personalizados para DOCX por archivo `.json` / `.yaml` / `.toml` (fuentes, colores, rellenos); para PDF, cada tema es CSS de imprenta + metadata JSON/YAML
+- **GUI de escritorio** (CustomTkinter): drag-and-drop real, lista de archivos reordenable (↑/↓ — el orden visible es el orden de unión), selector de tema con descripción, log con colores
 - **CLI** con patrones glob, modo batch y modo `--watch` (reconversión automática al guardar)
 - Tablas, imágenes (locales, remotas con reintentos, base64), hipervínculos internos/externos, tabla de contenido (`[TOC]`), saltos de página (`\pagebreak` o `<!-- pagebreak -->`), código con resaltado
 
@@ -89,9 +88,20 @@ docker run --rm -v "$PWD:/data" markitdocs python -m markitpdf.cli /data/doc.md 
 
 ## Temas
 
-### Temas PDF (`markitpdf/themes/`)
+Un tema se elige por **nombre** y aplica a los dos formatos: el `.css` viste el PDF y la metadata `.json`/`.yaml` (fuentes, colores) viste el Word.
 
-Cada tema es un `.css` de imprenta (con `@page`, numeración, viudas/huérfanas) más un `.json`/`.yaml` con su metadata (nombre, fuentes, colores). Incluidos: **professional** (corporativo azul) y **minimal** (editorial limpio). Para crear el tuyo: copia `professional.css` + `professional.json` con otro nombre, edítalos, y aparecerá automáticamente en la GUI y el CLI.
+| Tema | Estilo | Ideal para |
+|---|---|---|
+| `professional` | Corporativo azul, Segoe UI | Documentos técnicos y de negocio |
+| `minimal` | Editorial limpio, Inter, mucho blanco | Contenido editorial moderno |
+| `empresarial` | Ejecutivo serif, carbón + burdeos + dorado | Propuestas comerciales, dirección |
+| `academico` | Paper: Times, justificado, tablas booktabs | Artículos, tesis, informes académicos |
+| `economico` | Denso, tablas esmeralda protagonistas | Informes financieros y de costos |
+| `explicativo` | Didáctico: letra grande, notas ámbar | Manuales, tutoriales, formación |
+
+### Crear un tema nuevo (`markitpdf/themes/`)
+
+Copia `professional.css` + `professional.json` con otro nombre, edítalos, y el tema aparecerá automáticamente en la GUI y en ambos CLI.
 
 ### Temas DOCX
 

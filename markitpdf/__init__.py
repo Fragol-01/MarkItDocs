@@ -12,9 +12,10 @@ from .converter import (
     available_themes,
     convert_many_to_pdf,
     convert_markdown_to_pdf,
+    get_theme_metadata,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "BrowserNotFoundError",
     "ConversionResult",
@@ -24,5 +25,6 @@ __all__ = [
     "convert_many_to_pdf",
     "convert_markdown_to_pdf",
     "find_browser",
+    "get_theme_metadata",
     "__version__",
 ]

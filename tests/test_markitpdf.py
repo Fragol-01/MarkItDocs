@@ -33,10 +33,19 @@ def _browser_available() -> bool:
         return False
 
 
-def test_available_themes_includes_defaults():
+def test_available_themes_includes_all_six():
     themes = available_themes()
-    assert "professional" in themes
-    assert "minimal" in themes
+    for expected in ("professional", "minimal", "empresarial", "academico", "economico", "explicativo"):
+        assert expected in themes, f"Falta el tema '{expected}'"
+
+
+def test_to_docx_theme_types():
+    from markitpdf import get_theme_metadata
+
+    docx_theme = get_theme_metadata("empresarial").to_docx_theme()
+    assert docx_theme["body_font"] == "Constantia"
+    assert docx_theme["title_color"] == [0x7B, 0x2D, 0x3B]
+    assert docx_theme["table_head_fill"] == "E4DED2"
 
 
 def test_theme_metadata_loads_from_json():
@@ -96,8 +105,10 @@ def test_merged_pdf_from_md_and_html():
 
 
 if __name__ == "__main__":
-    test_available_themes_includes_defaults()
-    print("OK: test_available_themes_includes_defaults")
+    test_available_themes_includes_all_six()
+    print("OK: test_available_themes_includes_all_six")
+    test_to_docx_theme_types()
+    print("OK: test_to_docx_theme_types")
     test_theme_metadata_loads_from_json()
     print("OK: test_theme_metadata_loads_from_json")
     test_html_body_extraction()

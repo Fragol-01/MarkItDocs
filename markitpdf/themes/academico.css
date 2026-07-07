@@ -1,0 +1,154 @@
+/* Tema "academico" — estilo paper: serif, interlineado amplio, texto justificado */
+
+@page {
+    size: A4;
+    margin: 2.5cm 2.5cm 2.7cm 2.5cm;
+
+    @bottom-center {
+        content: counter(page);
+        font-family: "Times New Roman", Georgia, serif;
+        font-size: 10pt;
+        color: #444;
+    }
+}
+
+@page :first {
+    @bottom-center { content: ""; }
+}
+
+html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+body {
+    font-family: "Times New Roman", Georgia, serif;
+    font-size: 11pt;
+    line-height: 1.75;
+    color: #1a1a2e;
+    max-width: 100%;
+    text-align: justify;
+    hyphens: auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Times New Roman", Georgia, serif;
+    color: #1a1a2e;
+    break-after: avoid;
+    page-break-after: avoid;
+    text-align: left;
+}
+
+h1 {
+    font-size: 18pt;
+    font-weight: 700;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 1em;
+    page-break-before: always;
+}
+
+body > h1:first-of-type {
+    page-break-before: avoid;
+}
+
+h2 {
+    font-size: 13.5pt;
+    font-weight: 700;
+    margin-top: 1.8em;
+}
+
+h3 { font-size: 12pt; font-weight: 700; font-style: italic; margin-top: 1.4em; }
+h4 { font-size: 11pt; font-style: italic; margin-top: 1.2em; }
+h5 { font-size: 11pt; }
+h6 { font-size: 10.5pt; color: #444; }
+
+p { margin: 0 0 0.9em 0; orphans: 3; widows: 3; }
+
+a {
+    color: #14346b;
+    text-decoration: none;
+    border-bottom: 1px dotted #14346b;
+}
+
+code {
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 9.8pt;
+    background: #f4f4f6;
+    padding: 0.05em 0.3em;
+}
+
+pre {
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 9.5pt;
+    background: #f7f7f9;
+    border: 1px solid #d9d9e0;
+    padding: 0.9em 1.1em;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    page-break-inside: avoid;
+    line-height: 1.45;
+    text-align: left;
+}
+
+pre code { background: none; padding: 0; }
+
+blockquote {
+    margin: 1em 2em;
+    padding: 0;
+    border: none;
+    color: #33334a;
+    font-style: italic;
+    font-size: 10.5pt;
+}
+
+/* Tablas estilo booktabs: solo reglas horizontales */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.2em 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+    text-align: left;
+}
+
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+
+th, td {
+    border: none;
+    border-bottom: 1px solid #c9c9d4;
+    padding: 0.45em 0.8em;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    border-top: 2px solid #1a1a2e;
+    border-bottom: 1.5px solid #1a1a2e;
+    background: none;
+    font-weight: 700;
+}
+
+tbody tr:last-child td { border-bottom: 2px solid #1a1a2e; }
+
+ul, ol { margin: 0.4em 0 0.9em 0; padding-left: 2em; text-align: justify; }
+li { margin-bottom: 0.35em; }
+
+img {
+    max-width: 100%;
+    display: block;
+    margin: 1.4em auto;
+    page-break-inside: avoid;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #9a9aae;
+    width: 40%;
+    margin: 2em auto;
+}
+
+.toc { page-break-after: always; }
+.toc a { text-decoration: none; color: #1a1a2e; border-bottom: none; }

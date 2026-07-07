@@ -1,0 +1,36 @@
+name: Explicativo
+description: >-
+  Didáctico: letra grande, interlineado generoso y notas destacadas en
+  ámbar. Para manuales, tutoriales y material de formación.
+version: 1.0.0
+css: explicativo.css
+
+fonts:
+  body: Segoe UI
+  heading: Segoe UI Semibold
+  code: Cascadia Code
+
+colors:
+  title: "#0E7490"
+  text: "#1E293B"
+  link: "#0284C7"
+  rule: "#BAE6FD"
+  code_fill: "#F0F9FF"
+  quote_fill: "#FFF7E6"
+  table_head_fill: "#E0F2FE"
+
+sizes:
+  body_pt: 12
+  h1_pt: 24
+  h2_pt: 16
+  h3_pt: 13.5
+  h4_pt: 12.5
+  h5_pt: 12
+  h6_pt: 11
+
+page:
+  size: A4
+  margin_top_cm: 2.6
+  margin_right_cm: 2.4
+  margin_bottom_cm: 2.8
+  margin_left_cm: 2.4
