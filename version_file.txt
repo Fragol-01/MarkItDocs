@@ -3,8 +3,8 @@
 
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 0, 0),
-    prodvers=(2, 0, 0, 0),
+    filevers=(3, 0, 0, 0),
+    prodvers=(3, 0, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x4,
@@ -18,13 +18,13 @@ VSVersionInfo(
           "040904B0",
           [
             StringStruct("CompanyName", "MarkItDocs"),
-            StringStruct("FileDescription", "MarkItDocs - Conversor MD/HTML a DOCX/PDF"),
-            StringStruct("FileVersion", "2.0.0.0"),
+            StringStruct("FileDescription", "MarkItDocs - Conversor MD/HTML/LaTeX a DOCX/PDF"),
+            StringStruct("FileVersion", "3.0.0.0"),
             StringStruct("InternalName", "MarkItDocs"),
             StringStruct("LegalCopyright", "(c) 2026 MarkItDocs (MIT License)"),
             StringStruct("OriginalFilename", "MarkItDocs.exe"),
             StringStruct("ProductName", "MarkItDocs"),
-            StringStruct("ProductVersion", "2.0.0")
+            StringStruct("ProductVersion", "3.0.0")
           ]
         )
     ]),

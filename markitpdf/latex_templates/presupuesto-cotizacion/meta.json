@@ -1,0 +1,7 @@
+{
+  "name": "Presupuesto / Cotización",
+  "description": "Cotización profesional de servicios: alcance, entregables, tabla de inversión, plan de pagos, validez y firmas. Pensada para propuestas de desarrollo web a clientes.",
+  "kind": "starter",
+  "engine": "any",
+  "license": "MIT"
+}

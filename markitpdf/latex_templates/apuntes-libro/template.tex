@@ -1,0 +1,70 @@
+% =====================================================================
+%  MarkItDocs — Plantilla wrapper "Apuntes / Libro" (licencia MIT)
+%  Clase report: cada H1 del Markdown se convierte en un capítulo.
+%  Placeholders: title, author, date, accent, toc, preamble_extra, body
+% =====================================================================
+\documentclass[11pt,a4paper]{report}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=2.6cm,bottom=2.8cm,left=2.6cm,right=2.4cm]{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{csquotes}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath,amssymb}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{accent}{HTML}{((accent))}
+
+\lstset{
+  basicstyle=\small\ttfamily, backgroundcolor=\color{gray!8},
+  breaklines=true, showstringspaces=false, tabsize=2, frame=leftline,
+  rulecolor=\color{accent}, framerule=1.5pt,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'\i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {ñ}{{\~n}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1
+           {Ú}{{\'U}}1 {Ñ}{{\~N}}1 {¿}{{?`}}1 {¡}{{!`}}1
+}
+
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parskip}{0.4em}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\thepage}
+
+((preamble_extra))
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{4cm}
+  {\Huge\bfseries ((title))\par}
+  \vspace{1.5cm}
+  {\color{accent}\rule{0.55\linewidth}{2pt}\par}
+  \vspace{1.5cm}
+  {\Large ((author))\par}
+  \vspace{0.5cm}
+  {\large ((date))\par}
+  \vfill
+\end{titlepage}
+
+((toc))
+
+((body))
+
+\end{document}

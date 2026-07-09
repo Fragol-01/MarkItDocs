@@ -1,0 +1,89 @@
+% =====================================================================
+%  MarkItDocs — Starter "Plan de trabajo" (licencia MIT)
+%  Plan de proyecto: objetivos, fases, hitos, riesgos y equipo.
+%  EDITA el contenido de ejemplo.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=2.3cm,bottom=2.5cm,left=2.3cm,right=2.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{marca}{HTML}{B08D57}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\renewcommand{\arraystretch}{1.3}
+\titleformat{\section}{\large\bfseries\sffamily\color{marca!60!black}}{\thesection.}{0.5em}{}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries Plan de trabajo — [Nombre del proyecto]}\\[4pt]
+  {\color{marca}\rule{0.4\linewidth}{2pt}}\\[6pt]
+  {\small Responsable: [nombre] · Fecha: \today · Versión: 1.0}
+\end{center}
+
+\section{Objetivos}
+\begin{itemize}
+  \item Objetivo general: qué se quiere lograr al final del proyecto.
+  \item Objetivo específico 1: medible y con fecha.
+  \item Objetivo específico 2: medible y con fecha.
+\end{itemize}
+
+\section{Fases y actividades}
+\begin{longtable}{p{2.6cm} p{6.2cm} p{3.4cm} p{2.2cm}}
+  \toprule
+  \textbf{Fase} & \textbf{Actividades} & \textbf{Entregable} & \textbf{Duración}\\
+  \midrule
+  1. Análisis    & Levantamiento de requisitos, referencias y contenidos & Documento de alcance & 1 semana\\
+  2. Diseño      & Wireframes, diseño visual, revisión con cliente       & Maquetas aprobadas   & 2 semanas\\
+  3. Desarrollo  & Implementación frontend/backend, integraciones        & Sitio en preproducción & 3 semanas\\
+  4. Lanzamiento & Pruebas, despliegue, dominio y SSL                    & Sitio en producción  & 1 semana\\
+  5. Seguimiento & Soporte post-lanzamiento y ajustes                    & Informe de cierre    & 4 semanas\\
+  \bottomrule
+\end{longtable}
+
+\section{Hitos}
+\begin{longtable}{p{5.2cm} p{3.2cm} p{6cm}}
+  \toprule
+  \textbf{Hito} & \textbf{Fecha objetivo} & \textbf{Criterio de aceptación}\\
+  \midrule
+  Alcance aprobado      & [fecha] & Documento firmado por el cliente\\
+  Diseño aprobado       & [fecha] & Maquetas validadas (máx. 2 rondas)\\
+  Entrega en producción & [fecha] & Sitio publicado y verificado\\
+  Cierre del proyecto   & [fecha] & Informe final entregado\\
+  \bottomrule
+\end{longtable}
+
+\section{Riesgos y mitigación}
+\begin{longtable}{p{5.6cm} p{2.2cm} p{6.6cm}}
+  \toprule
+  \textbf{Riesgo} & \textbf{Impacto} & \textbf{Mitigación}\\
+  \midrule
+  Retraso en contenidos del cliente & Alto  & Fechas límite acordadas y recordatorios\\
+  Cambios de alcance                & Medio & Control de cambios presupuestado aparte\\
+  Indisponibilidad del hosting      & Bajo  & Proveedor con SLA y copias de seguridad\\
+  \bottomrule
+\end{longtable}
+
+\section{Equipo y responsabilidades}
+\begin{itemize}
+  \item \textbf{[Nombre]} — dirección del proyecto y desarrollo.
+  \item \textbf{[Nombre]} — diseño UI/UX.
+  \item \textbf{[Cliente]} — contenidos y aprobaciones.
+\end{itemize}
+
+\end{document}

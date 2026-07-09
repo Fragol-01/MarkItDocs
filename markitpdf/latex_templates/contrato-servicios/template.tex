@@ -1,0 +1,97 @@
+% =====================================================================
+%  MarkItDocs — Starter "Contrato de servicios" (licencia MIT)
+%  Modelo ORIENTATIVO de contrato de desarrollo web. No constituye
+%  asesoría legal: revísalo con un profesional antes de firmarlo.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=2.6cm,bottom=2.8cm,left=2.8cm,right=2.8cm]{geometry}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries CONTRATO DE PRESTACIÓN DE SERVICIOS\\DE DESARROLLO WEB}\\[4pt]
+  {\small Ref. C-2026-001 · \today}
+\end{center}
+
+\vspace{0.8em}
+\textbf{REUNIDOS}
+
+De una parte, \textbf{[Nombre del proveedor]}, con NIF/RUC [número] y domicilio
+en [dirección] (en adelante, «el Proveedor»).
+
+De otra parte, \textbf{[Nombre del cliente]}, con NIF/RUC [número] y domicilio
+en [dirección] (en adelante, «el Cliente»).
+
+Ambas partes se reconocen capacidad legal suficiente y acuerdan las siguientes
+
+\begin{center}\textbf{CLÁUSULAS}\end{center}
+
+\begin{enumerate}[label=\textbf{\arabic*.}, leftmargin=2em]
+
+\item \textbf{Objeto.} El Proveedor prestará al Cliente los servicios de
+diseño, desarrollo, despliegue y, en su caso, mantenimiento del sitio o
+aplicación web descritos en el presupuesto Ref. [P-2026-001], que forma parte
+integrante de este contrato.
+
+\item \textbf{Alcance.} Cualquier funcionalidad no recogida expresamente en el
+presupuesto queda fuera del alcance y se presupuestará por separado.
+
+\item \textbf{Plazo.} El desarrollo se entregará en un plazo estimado de
+[N] semanas desde la firma y el pago inicial, salvo retrasos imputables a la
+falta de materiales o aprobaciones del Cliente.
+
+\item \textbf{Precio y forma de pago.} El precio total es de [importe]
+[moneda], pagadero 50\,\% a la firma y 50\,\% a la entrega. El mantenimiento,
+si se contrata, se factura a mes vencido a razón de [importe]/mes.
+
+\item \textbf{Obligaciones del Cliente.} Entregar en plazo los contenidos,
+accesos y aprobaciones necesarios; designar un interlocutor único.
+
+\item \textbf{Propiedad intelectual.} Con el pago íntegro, el Cliente adquiere
+los derechos de explotación del sitio entregado. El Proveedor conserva la
+titularidad de librerías, herramientas y componentes genéricos propios, sobre
+los que concede al Cliente una licencia de uso no exclusiva.
+
+\item \textbf{Confidencialidad.} Las partes se obligan a no divulgar la
+información confidencial intercambiada, durante la vigencia del contrato y
+los [2] años siguientes.
+
+\item \textbf{Garantía y soporte.} El Proveedor corregirá sin coste los
+defectos reproducibles reportados dentro de los [30] días posteriores a la
+entrega. No cubre daños causados por modificaciones de terceros.
+
+\item \textbf{Resolución.} El incumplimiento grave de cualquiera de las
+cláusulas faculta a la otra parte a resolver el contrato, con liquidación de
+los trabajos ejecutados hasta la fecha.
+
+\item \textbf{Ley aplicable y jurisdicción.} Este contrato se rige por la
+legislación de [país]; las partes se someten a los juzgados de [ciudad].
+
+\end{enumerate}
+
+Y en prueba de conformidad, firman por duplicado en [ciudad], a \today.
+
+\vspace{3.5em}
+\begin{minipage}{0.45\linewidth}
+  \rule{\linewidth}{0.4pt}\\ \textbf{El Proveedor}
+\end{minipage}\hfill
+\begin{minipage}{0.45\linewidth}
+  \rule{\linewidth}{0.4pt}\\ \textbf{El Cliente}
+\end{minipage}
+
+\end{document}

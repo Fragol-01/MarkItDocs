@@ -1,13 +1,26 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Build: pyinstaller MD_to_DOCX.spec
+# Build: pyinstaller MarkItDocs.spec
+
+from PyInstaller.utils.hooks import collect_all
+
+# pypdfium2 carga pdfium.dll como data ctypes: hay que arrastrar el paquete entero.
+pdfium_datas, pdfium_binaries, pdfium_hidden = [], [], []
+for pkg in ('pypdfium2', 'pypdfium2_raw'):
+    d, b, h = collect_all(pkg)
+    pdfium_datas += d
+    pdfium_binaries += b
+    pdfium_hidden += h
 
 a = Analysis(
     ['app.py'],
     pathex=[],
-    binaries=[],
-    # Los temas de markitpdf son data files (css/json/yaml): PyInstaller no los
-    # incluye solo, y sin ellos la exportación a PDF falla dentro del .exe.
-    datas=[('markitpdf/themes', 'markitpdf/themes')],
+    binaries=pdfium_binaries,
+    # Los temas y plantillas LaTeX son data files: PyInstaller no los incluye
+    # solo, y sin ellos la exportación a PDF/LaTeX falla dentro del .exe.
+    datas=[
+        ('markitpdf/themes', 'markitpdf/themes'),
+        ('markitpdf/latex_templates', 'markitpdf/latex_templates'),
+    ] + pdfium_datas,
     hiddenimports=[
         'markdown.extensions.extra',
         'markdown.extensions.tables',
@@ -19,7 +32,8 @@ a = Analysis(
         'pygments.formatters.html',
         'pygments.lexers',
         'yaml',
-    ],
+        'mistletoe',
+    ] + pdfium_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -1,0 +1,80 @@
+% =====================================================================
+%  MarkItDocs — Starter "Currículum profesional" (licencia MIT)
+%  CV autocontenido (sin paquetes exóticos): compila en cualquier
+%  instalación LaTeX. EDITA los datos de ejemplo.
+%  Tip: cambia el color 'acento' para personalizarlo en segundos.
+% =====================================================================
+\documentclass[10.5pt,a4paper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=1.8cm,bottom=1.8cm,left=2cm,right=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{acento}{HTML}{1F4E79}
+\definecolor{grissuave}{HTML}{5A6472}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.35em}
+\pagestyle{empty}
+
+% Secciones con línea de acento
+\titleformat{\section}{\large\bfseries\sffamily\color{acento}}{}{0em}{}[{\color{acento}\titlerule[1.2pt]}]
+\titlespacing{\section}{0pt}{1em}{0.5em}
+
+% \entrada{periodo}{puesto}{organización}{descripción}
+\newcommand{\entrada}[4]{%
+  \textbf{#2} \hfill {\small\color{grissuave}#1}\\
+  {\itshape\color{grissuave}#3}\\[1pt]
+  #4\par\vspace{0.55em}}
+
+\begin{document}
+
+% ------------------------------ CABECERA ------------------------------
+{\Huge\bfseries\sffamily Nombre Apellidos}\\[3pt]
+{\Large\sffamily\color{acento} Desarrollador Web Full-Stack}\\[6pt]
+{\small\color{grissuave}
+  Ciudad, País \textbullet{} +00 000 000 000 \textbullet{}
+  \href{mailto:correo@ejemplo.com}{correo@ejemplo.com} \textbullet{}
+  \href{https://github.com/tu-usuario}{github.com/tu-usuario}}
+
+\section{Perfil}
+Desarrollador web con experiencia en el ciclo completo: diseño, desarrollo,
+despliegue y mantenimiento. Especializado en productos rápidos, accesibles y
+fáciles de mantener para pymes y emprendedores.
+
+\section{Experiencia}
+\entrada{2024 -- hoy}{Desarrollador Web Freelance}{Independiente · Remoto}{%
+Diseño y desarrollo de sitios y aplicaciones web: landing pages, tiendas
+online y paneles a medida. Gestión de hosting, dominios y despliegue.}
+\entrada{2022 -- 2024}{Puesto anterior}{Empresa · Ciudad}{%
+Describe logros medibles: qué construiste, con qué tecnologías y qué
+resultado tuvo (rendimiento, ventas, usuarios).}
+
+\section{Formación}
+\entrada{2018 -- 2022}{Título obtenido}{Universidad / Instituto · Ciudad}{%
+Especialidad, honores o proyectos destacados.}
+
+\section{Habilidades}
+\begin{tabular}{@{}p{2.6cm} p{13.5cm}@{}}
+  \textbf{Frontend} & HTML, CSS, JavaScript, React\\
+  \textbf{Backend}  & Python, Node.js, bases de datos SQL\\
+  \textbf{DevOps}   & Git, despliegue en la nube, dominios y DNS\\
+  \textbf{Idiomas}  & Español (nativo) · Inglés (profesional)\\
+\end{tabular}
+
+\section{Proyectos}
+\entrada{2026}{Nombre del proyecto}{\href{https://proyecto.com}{proyecto.com}}{%
+Una línea que explique qué hace el proyecto y tu papel en él.}
+
+\end{document}

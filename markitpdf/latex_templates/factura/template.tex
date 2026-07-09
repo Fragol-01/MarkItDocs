@@ -1,0 +1,90 @@
+% =====================================================================
+%  MarkItDocs — Starter "Factura" (licencia MIT)
+%  Factura de servicios con tabla de conceptos y bloque de totales.
+%  EDITA los datos y los importes (los totales se escriben a mano).
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=2.2cm,bottom=2.4cm,left=2.2cm,right=2.2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{marca}{HTML}{0B6E4F}
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+\renewcommand{\arraystretch}{1.35}
+
+\begin{document}
+
+% ------------------------------ CABECERA ------------------------------
+\begin{minipage}[t]{0.58\linewidth}
+  {\LARGE\bfseries\color{marca} Tu Nombre o Empresa}\\[2pt]
+  NIF/RUC: 00000000X\\
+  Calle y número · Ciudad\\
+  correo@ejemplo.com · +00 000 000 000
+\end{minipage}%
+\begin{minipage}[t]{0.42\linewidth}
+  \begin{flushright}
+    {\Huge\bfseries\color{marca} FACTURA}\\[6pt]
+    \textbf{N.º:} 2026-001\\
+    \textbf{Fecha:} \today\\
+    \textbf{Vencimiento:} 30 días
+  \end{flushright}
+\end{minipage}
+
+\vspace{1.2em}
+{\color{marca}\hrule height 1.5pt}
+\vspace{1.2em}
+
+% ------------------------------- CLIENTE -------------------------------
+\textbf{Facturar a:}\\
+Nombre del cliente\\
+NIF/RUC del cliente\\
+Dirección del cliente
+
+\vspace{1.5em}
+
+% ------------------------------ CONCEPTOS ------------------------------
+\begin{tabular}{p{7.6cm} r r r}
+  \toprule
+  \textbf{Concepto} & \textbf{Cant.} & \textbf{Precio unit.} & \textbf{Importe}\\
+  \midrule
+  Diseño web (UI/UX)                        & 1 & 300,00 & 300,00\\
+  Desarrollo frontend y backend             & 1 & 700,00 & 700,00\\
+  Configuración de hosting y dominio        & 1 &  80,00 &  80,00\\
+  Mantenimiento mensual (primer mes)        & 1 &  50,00 &  50,00\\
+  \bottomrule
+\end{tabular}
+
+\vspace{1.5em}
+
+% ------------------------------- TOTALES -------------------------------
+\begin{flushright}
+\begin{tabular}{l r}
+  Subtotal          & 1.130,00\\
+  Impuestos (0\,\%) & 0,00\\
+  \midrule
+  \textbf{TOTAL}    & \textbf{1.130,00}\\
+\end{tabular}
+\end{flushright}
+
+\vspace{2em}
+
+% ----------------------------- CONDICIONES -----------------------------
+{\small
+\textbf{Forma de pago:} transferencia bancaria a la cuenta XXXX-XXXX-XXXX.\\
+\textbf{Condiciones:} pago a 30 días desde la fecha de emisión. Los importes
+se expresan en la moneda acordada. Gracias por su confianza.}
+
+\end{document}

@@ -1,0 +1,7 @@
+{
+  "name": "Carta formal",
+  "description": "Carta profesional con membrete a color, fecha automática, bloque de destinatario, asunto y firma. Para comunicaciones con clientes, instituciones y empresas.",
+  "kind": "starter",
+  "engine": "any",
+  "license": "MIT"
+}

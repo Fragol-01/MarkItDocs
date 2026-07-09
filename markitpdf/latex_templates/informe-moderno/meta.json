@@ -1,0 +1,10 @@
+{
+  "name": "Informe moderno",
+  "description": "Informe profesional con portada a color, cabecera con línea de acento e índice. Estética inspirada en Eisvogel, la plantilla más popular de la comunidad pandoc/LaTeX.",
+  "kind": "wrapper",
+  "engine": "any",
+  "license": "MIT (diseño inspirado en Eisvogel, BSD-3-Clause, sin código copiado)",
+  "attribution": "Inspirado en Wandmalfarbe/pandoc-latex-template (Eisvogel)",
+  "toc_default": true,
+  "accent": "1F4E79"
+}

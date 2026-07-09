@@ -1,0 +1,54 @@
+% =====================================================================
+%  MarkItDocs — Plantilla wrapper "Artículo científico" (licencia MIT)
+%  Formato de artículo académico: serif, secciones numeradas, márgenes
+%  compactos, notación matemática ($...$ del Markdown pasa directo).
+%  Placeholders: title, author, date, toc, preamble_extra, body
+% =====================================================================
+\documentclass[10pt,a4paper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=2.4cm,bottom=2.6cm,left=2.6cm,right=2.6cm]{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{csquotes}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath,amssymb}
+\usepackage[hidelinks]{hyperref}
+
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true, showstringspaces=false, tabsize=2, frame=lines,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'\i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {ñ}{{\~n}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1
+           {Ú}{{\'U}}1 {Ñ}{{\~N}}1 {¿}{{?`}}1 {¡}{{!`}}1
+}
+
+\renewcommand{\arraystretch}{1.2}
+
+((preamble_extra))
+
+\title{\bfseries ((title))}
+\author{((author))}
+\date{((date))}
+
+\begin{document}
+
+\maketitle
+
+((toc))
+
+((body))
+
+\end{document}

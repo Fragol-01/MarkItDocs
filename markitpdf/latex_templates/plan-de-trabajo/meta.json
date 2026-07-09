@@ -1,0 +1,7 @@
+{
+  "name": "Plan de trabajo",
+  "description": "Plan de proyecto con objetivos, tabla de fases y actividades, hitos con criterios de aceptación, matriz de riesgos y equipo. Para planificar proyectos con clientes.",
+  "kind": "starter",
+  "engine": "any",
+  "license": "MIT"
+}

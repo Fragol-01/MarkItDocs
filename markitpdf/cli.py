@@ -1,4 +1,4 @@
-"""CLI: python -m markitpdf.cli archivo.md|archivo.html [-o salida.pdf] [--theme <tema>] [archivos...]"""
+"""CLI: python -m markitpdf.cli entrada.md|.html|.tex [-o salida.pdf] [--theme|--latex-template]"""
 
 from __future__ import annotations
 
@@ -8,17 +8,26 @@ from pathlib import Path
 
 from .browser import BrowserNotFoundError
 from .converter import available_themes, convert_many_to_pdf, convert_markdown_to_pdf
+from .latex import LatexCompileError, LatexNotFoundError, compile_tex
+from .textemplates import (
+    available_latex_templates,
+    convert_markdown_via_latex,
+    get_latex_template_meta,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="markitpdf",
-        description="Convierte archivos Markdown o HTML a PDF con tipografía profesional.",
+        description=(
+            "Convierte Markdown/HTML a PDF con temas, compila LaTeX (.tex) y "
+            "genera PDFs desde plantillas LaTeX de la comunidad."
+        ),
     )
     parser.add_argument(
         "inputs",
-        nargs="+",
-        help="Ruta(s) de archivo(s) .md/.markdown/.html/.htm de entrada (se unen en orden en un solo PDF)",
+        nargs="*",
+        help="Archivo(s) .md/.html (se unen en un PDF) o .tex (se compila cada uno)",
     )
     parser.add_argument(
         "-o", "--output",
@@ -27,13 +36,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--theme",
         default="professional",
-        choices=available_themes(),
-        help="Tema tipográfico a usar (default: professional)",
+        help="Tema HTML a usar (default: professional). Ver --list-themes",
     )
     parser.add_argument(
-        "--list-themes",
-        action="store_true",
-        help="Lista los temas disponibles y sale",
+        "--latex-template",
+        metavar="PLANTILLA",
+        help="Convierte los .md vía LaTeX con esta plantilla wrapper. Ver --list-latex-templates",
+    )
+    parser.add_argument("--author", default="", help="Autor para la portada (vía LaTeX)")
+    parser.add_argument(
+        "--toc", action=argparse.BooleanOptionalAction, default=None,
+        help="Forzar índice on/off en la vía LaTeX (default: según plantilla)",
+    )
+    parser.add_argument("--list-themes", action="store_true", help="Lista los temas HTML y sale")
+    parser.add_argument(
+        "--list-latex-templates", action="store_true",
+        help="Lista las plantillas LaTeX (wrapper y starter) y sale",
     )
     return parser
 
@@ -46,21 +64,50 @@ def main(argv: list[str] | None = None) -> int:
         for name in available_themes():
             print(name)
         return 0
+    if args.list_latex_templates:
+        for tid in available_latex_templates():
+            meta = get_latex_template_meta(tid)
+            print(f"{tid}  [{meta.get('kind')}]  {meta.get('name')} — {meta.get('description')}")
+        return 0
+    if not args.inputs:
+        parser.error("se requiere al menos un archivo de entrada")
+
+    paths = [Path(p) for p in args.inputs]
+    tex_inputs = [p for p in paths if p.suffix.lower() == ".tex"]
 
     try:
-        if len(args.inputs) == 1:
-            output = convert_markdown_to_pdf(
-                Path(args.inputs[0]),
+        if tex_inputs:
+            if len(tex_inputs) != len(paths):
+                print("Error: no mezcles .tex con .md/.html en la misma llamada.", file=sys.stderr)
+                return 1
+            if args.output and len(tex_inputs) > 1:
+                print("Error: -o solo se admite con un único .tex.", file=sys.stderr)
+                return 1
+            for tex in tex_inputs:
+                out = compile_tex(tex, Path(args.output) if args.output else None)
+                print(f"PDF creado: {out}")
+            return 0
+
+        if args.latex_template:
+            output = convert_markdown_via_latex(
+                paths,
                 Path(args.output) if args.output else None,
-                theme=args.theme,
+                template=args.latex_template,
+                author=args.author,
+                toc=args.toc,
+            )
+        elif len(paths) == 1:
+            output = convert_markdown_to_pdf(
+                paths[0], Path(args.output) if args.output else None, theme=args.theme
             )
         else:
             output = convert_many_to_pdf(
-                [Path(p) for p in args.inputs],
-                Path(args.output) if args.output else None,
-                theme=args.theme,
+                paths, Path(args.output) if args.output else None, theme=args.theme
             )
-    except (FileNotFoundError, BrowserNotFoundError, TimeoutError, RuntimeError, ValueError) as exc:
+    except (
+        FileNotFoundError, BrowserNotFoundError, LatexNotFoundError,
+        LatexCompileError, TimeoutError, RuntimeError, ValueError,
+    ) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 

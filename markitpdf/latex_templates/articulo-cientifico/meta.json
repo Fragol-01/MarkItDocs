@@ -1,0 +1,9 @@
+{
+  "name": "Artículo científico",
+  "description": "Formato académico clásico: tipografía serif, secciones numeradas, soporte de fórmulas matemáticas ($...$) y tablas booktabs. Para papers, ensayos y trabajos de investigación.",
+  "kind": "wrapper",
+  "engine": "any",
+  "license": "MIT",
+  "toc_default": false,
+  "accent": "000000"
+}

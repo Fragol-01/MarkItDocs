@@ -1,0 +1,94 @@
+% =====================================================================
+%  MarkItDocs — Starter "Presupuesto / Cotización" (licencia MIT)
+%  Cotización de servicios (pensada para desarrollo web): alcance,
+%  entregables, inversión, validez y condiciones. EDITA los datos.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+\fi
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage[top=2.3cm,bottom=2.5cm,left=2.3cm,right=2.3cm]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{marca}{HTML}{1F4E79}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\renewcommand{\arraystretch}{1.3}
+\titleformat{\section}{\large\bfseries\sffamily\color{marca}}{\thesection.}{0.5em}{}
+
+\begin{document}
+
+% ------------------------------ CABECERA ------------------------------
+\begin{minipage}[t]{0.58\linewidth}
+  {\LARGE\bfseries\color{marca} Tu Nombre o Empresa}\\[2pt]
+  Desarrollo web · Diseño · Despliegue\\
+  correo@ejemplo.com · +00 000 000 000
+\end{minipage}%
+\begin{minipage}[t]{0.42\linewidth}
+  \begin{flushright}
+    {\huge\bfseries\color{marca} PRESUPUESTO}\\[6pt]
+    \textbf{Ref.:} P-2026-001\\
+    \textbf{Fecha:} \today\\
+    \textbf{Cliente:} Nombre del cliente
+  \end{flushright}
+\end{minipage}
+
+\vspace{0.8em}
+{\color{marca}\hrule height 1.5pt}
+
+\section{Alcance del proyecto}
+Describe en dos o tres frases qué se va a construir: por ejemplo, un sitio web
+corporativo de 5 páginas con diseño a medida, formulario de contacto,
+optimización SEO básica y panel de administración de contenidos.
+
+\section{Entregables}
+\begin{itemize}
+  \item Diseño UI/UX aprobado por el cliente (2 rondas de revisión).
+  \item Sitio web responsive publicado en producción.
+  \item Configuración de dominio, hosting y certificado SSL.
+  \item Manual breve de uso y 30 días de soporte post-lanzamiento.
+\end{itemize}
+
+\section{Inversión}
+\begin{tabular}{p{8.2cm} r}
+  \toprule
+  \textbf{Concepto} & \textbf{Importe}\\
+  \midrule
+  Diseño UI/UX                                   & 300,00\\
+  Desarrollo (frontend + backend)                & 700,00\\
+  Hosting y dominio (primer año)                 & 120,00\\
+  \midrule
+  \textbf{Total del proyecto}                    & \textbf{1.120,00}\\
+  Mantenimiento mensual opcional                 & 50,00/mes\\
+  \bottomrule
+\end{tabular}
+
+\section{Plan de pagos}
+50\,\% a la aceptación del presupuesto, 50\,\% a la entrega. El mantenimiento
+se factura a mes vencido.
+
+\section{Validez y condiciones}
+Este presupuesto es válido durante \textbf{30 días} desde la fecha de emisión.
+No incluye redacción de contenidos ni licencias de terceros salvo indicación
+expresa. Los cambios de alcance se presupuestan aparte.
+
+\vspace{2.5em}
+\begin{minipage}{0.45\linewidth}
+  \rule{\linewidth}{0.4pt}\\ \textbf{El proveedor}
+\end{minipage}\hfill
+\begin{minipage}{0.45\linewidth}
+  \rule{\linewidth}{0.4pt}\\ \textbf{El cliente} (aceptación)
+\end{minipage}
+
+\end{document}

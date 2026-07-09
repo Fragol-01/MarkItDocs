@@ -1,23 +1,28 @@
 # MarkItDocs
 
-**Convierte Markdown y HTML a documentos Word (.docx) y PDF con formato profesional** — desde una app de escritorio con drag-and-drop o desde la línea de comandos.
+**Convierte Markdown, HTML y LaTeX a documentos Word (.docx) y PDF con formato profesional** — desde una app de escritorio con drag-and-drop, vista previa en vivo y diseñador visual de temas, o desde la línea de comandos.
 
-> **English TL;DR** — MarkItDocs converts Markdown/HTML files into polished .docx and .pdf documents. Desktop GUI (drag & drop) + CLI. Merge many files into one document or convert them separately. Themeable via CSS (PDF) and JSON/YAML/TOML (DOCX). PDF rendering uses your installed Edge/Chrome in headless mode — no heavyweight dependencies. Inspired by [microsoft/markitdown](https://github.com/microsoft/markitdown), in the opposite direction.
+> **English TL;DR** — MarkItDocs converts Markdown/HTML/LaTeX files into polished .docx and .pdf documents. Desktop GUI (drag & drop, live preview, visual theme designer) + CLI. Compile `.tex` directly, or route your Markdown through community LaTeX templates (report, scientific article, book). 10 LaTeX templates included: invoice, quote, contract, CV, formal letter, work plan… PDF rendering uses your installed Edge/Chrome (HTML themes) or your LaTeX engine (MiKTeX/TeX Live/Tectonic — downloadable in one click). Inspired by [microsoft/markitdown](https://github.com/microsoft/markitdown), in the opposite direction.
 
 ---
 
 ## Características
 
-- **Entradas**: `.md`, `.markdown`, `.html`, `.htm`
+- **Entradas**: `.md`, `.markdown`, `.html`, `.htm` y **`.tex` (LaTeX)**
 - **Salidas**: `.docx` (Word) y `.pdf`
+- **Dos motores de PDF**:
+  - *Temas HTML*: render con tu Edge/Chrome headless — 6 temas CSS integrados
+  - *Plantillas LaTeX*: tu Markdown se convierte a LaTeX y se compila con una plantilla de la comunidad (informe estilo Eisvogel, artículo científico, libro con capítulos…)
+- **Vista previa en vivo** (panel lateral): ves el PDF real página a página, con zoom, y se actualiza sola al cambiar archivo, tema o plantilla — ideal para comparar plantillas antes de exportar
+- **Diseñador visual de temas**: edita colores, fuentes, tamaños, márgenes y tablas por elemento con vista previa instantánea; guarda tu tema y viste **Word y PDF** a la vez. Pestaña de preámbulo LaTeX para personalización infinita
+- **10 plantillas LaTeX incluidas**: 4 para envolver tus .md + 6 documentos editables (factura, presupuesto, contrato, CV, carta formal, plan de trabajo)
 - **Dos modos de conversión**:
   - *Separado*: N archivos de entrada → N documentos de salida
   - *Unido*: N archivos de entrada → **1 solo documento**, en orden, con salto de página entre cada archivo
 - **6 temas integrados que visten Word Y PDF a la vez**: `professional`, `minimal`, `empresarial`, `academico`, `economico`, `explicativo` — un solo selector, tú decides el formato de salida
-- Temas personalizados para DOCX por archivo `.json` / `.yaml` / `.toml` (fuentes, colores, rellenos); para PDF, cada tema es CSS de imprenta + metadata JSON/YAML
-- **GUI de escritorio** (CustomTkinter): drag-and-drop real, lista de archivos reordenable (↑/↓ — el orden visible es el orden de unión), selector de tema con descripción, log con colores
-- **CLI** con patrones glob, modo batch y modo `--watch` (reconversión automática al guardar)
-- Tablas, imágenes (locales, remotas con reintentos, base64), hipervínculos internos/externos, tabla de contenido (`[TOC]`), saltos de página (`\pagebreak` o `<!-- pagebreak -->`), código con resaltado
+- **GUI de escritorio** (CustomTkinter): drag-and-drop real, lista reordenable (↑/↓ — el orden visible es el orden de unión), galería «Nuevo desde plantilla…», log con colores
+- **CLI** con patrones glob, modo batch, modo `--watch`, `--latex-template` y compilación directa de `.tex`
+- Tablas, imágenes, hipervínculos, `[TOC]`, saltos de página, código con resaltado, fórmulas `$...$` (vía LaTeX)
 
 ## Instalación
 
@@ -27,7 +32,7 @@ cd MarkItDocs
 pip install -r requirements.txt
 ```
 
-Requisitos: Python 3.11+ · Para exportar PDF: Microsoft Edge o Google Chrome instalado (en Windows, Edge ya viene preinstalado).
+Requisitos: Python 3.11+ · Para PDF con temas HTML: Microsoft Edge o Google Chrome (en Windows, Edge ya viene preinstalado) · Para la vía LaTeX: MiKTeX/TeX Live si ya lo tienes, o el botón **«Descargar Tectonic (~30 MB)»** de la app lo instala sin permisos de administrador.
 
 ### Ejecutables
 
@@ -78,6 +83,19 @@ python -m markitpdf.cli documento.md --theme minimal
 python -m markitpdf.cli 01_intro.md 02_desarrollo.html 03_fin.md -o libro.pdf
 ```
 
+### CLI — LaTeX
+
+```bash
+# Compilar un .tex directamente (detecta MiKTeX/TeX Live/Tectonic)
+python -m markitpdf.cli documento.tex
+
+# Markdown → PDF a través de una plantilla LaTeX de la comunidad
+python -m markitpdf.cli informe.md --latex-template informe-moderno --author "Tu Nombre"
+
+# Ver el catálogo de plantillas
+python -m markitpdf.cli --list-latex-templates
+```
+
 ### Docker (CLI/headless, sin GUI)
 
 ```bash
@@ -99,9 +117,30 @@ Un tema se elige por **nombre** y aplica a los dos formatos: el `.css` viste el 
 | `economico` | Denso, tablas esmeralda protagonistas | Informes financieros y de costos |
 | `explicativo` | Didáctico: letra grande, notas ámbar | Manuales, tutoriales, formación |
 
-### Crear un tema nuevo (`markitpdf/themes/`)
+### Crear un tema nuevo
 
-Copia `professional.css` + `professional.json` con otro nombre, edítalos, y el tema aparecerá automáticamente en la GUI y en ambos CLI.
+**Con el Diseñador visual (recomendado)**: botón «🎨 Diseñador…» en la GUI — eliges un elemento (títulos, tablas, citas, código, página…), ajustas sus propiedades con vista previa en vivo y guardas. El tema queda en `%APPDATA%\MarkItDocs\themes\` y aplica a Word y PDF.
+
+**A mano** (`markitpdf/themes/`): copia `professional.css` + `professional.json` con otro nombre, edítalos, y el tema aparecerá automáticamente en la GUI y en ambos CLI.
+
+## Plantillas LaTeX (`markitpdf/latex_templates/`)
+
+| Plantilla | Tipo | Para qué |
+|---|---|---|
+| `informe-moderno` | Envuelve tus .md | Informe profesional con portada a color (estética inspirada en Eisvogel) |
+| `articulo-cientifico` | Envuelve tus .md | Paper académico: serif, secciones numeradas, fórmulas `$...$` |
+| `apuntes-libro` | Envuelve tus .md | Cada H1 = un capítulo; portada e índice |
+| `informe-clasico` | Envuelve tus .md | LaTeX sobrio en blanco y negro |
+| `factura` | Documento editable | Factura con tabla de conceptos y totales |
+| `presupuesto-cotizacion` | Documento editable | Cotización de servicios con alcance y firmas |
+| `contrato-servicios` | Documento editable | Contrato de desarrollo web (modelo orientativo) |
+| `cv-profesional` | Documento editable | CV de una página, autocontenido |
+| `carta-formal` | Documento editable | Carta con membrete y firma |
+| `plan-de-trabajo` | Documento editable | Fases, hitos, riesgos y equipo |
+
+Los «documentos editables» se instancian desde la GUI («Nuevo desde plantilla…») como `.tex` que rellenas y compilas con el botón PDF. Para crear tu propia plantilla: copia una carpeta, edita `template.tex` (placeholders `((title))`, `((body))`, `((preamble_extra))`…) y `meta.json`.
+
+Licencias de componentes de terceros: [LICENSES-3RD-PARTY.md](LICENSES-3RD-PARTY.md).
 
 ### Temas DOCX
 
@@ -122,17 +161,24 @@ hr_color: [180, 190, 205]
 ## Arquitectura
 
 ```
-app.py                  # GUI (CustomTkinter + tkinterdnd2)
+app.py                  # GUI (CustomTkinter + tkinterdnd2) con vista previa en vivo
+designer.py             # Diseñador visual de temas (3 columnas + preview)
 crear_documento.py      # Motor MD/HTML → DOCX (python-docx) + CLI
-markitpdf/              # Subpaquete MD/HTML → PDF
-├── converter.py        #   render vía Chromium headless (Edge/Chrome)
+markitpdf/              # Subpaquete de PDF
+├── converter.py        #   MD/HTML → PDF vía Chromium headless (Edge/Chrome)
 ├── browser.py          #   detección del navegador por SO
+├── latex.py            #   motor LaTeX: detección, compilación, descarga de Tectonic
+├── md2tex.py           #   Markdown → LaTeX (mistletoe)
+├── textemplates.py     #   catálogo e instanciación de plantillas LaTeX
+├── themebuilder.py     #   modelo del Diseñador → CSS + metadata
+├── preview.py          #   PDF → imágenes (pypdfium2) para la vista previa
 ├── cli.py              #   CLI del subpaquete
-└── themes/             #   temas CSS + metadata JSON/YAML
+├── themes/             #   temas CSS + metadata JSON/YAML
+└── latex_templates/    #   plantillas LaTeX (template.tex + meta.json)
 tests/                  # self-checks ejecutables (sin framework)
 ```
 
-El PDF se genera renderizando HTML+CSS con el Chromium que ya tienes instalado (`--headless --print-to-pdf`): tipografía real de navegador sin dependencias pesadas (sin wkhtmltopdf, sin LaTeX).
+El PDF con temas HTML se genera renderizando HTML+CSS con el Chromium que ya tienes instalado (`--headless --print-to-pdf`). La vía LaTeX usa tu MiKTeX/TeX Live, o Tectonic (MIT, un solo ejecutable) que la app puede descargar. La vista previa muestra el PDF real convertido a imágenes con pypdfium2 — lo que ves es exactamente lo que exportas.
 
 ## Compilar tu propio ejecutable
 
@@ -147,11 +193,12 @@ pyinstaller MarkItDocs.spec
 ```bash
 python tests/test_crear_documento.py
 python tests/test_markitpdf.py
+python tests/test_latex_features.py
 # o con pytest, si lo prefieres:
 pytest tests/
 ```
 
-Los tests de PDF se omiten automáticamente si no hay Edge/Chrome disponible.
+Los tests de PDF se omiten automáticamente si no hay Edge/Chrome; los de LaTeX, si no hay motor LaTeX.
 
 ## Contribuir
 

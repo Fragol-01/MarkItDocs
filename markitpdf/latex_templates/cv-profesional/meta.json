@@ -1,0 +1,7 @@
+{
+  "name": "Currículum profesional",
+  "description": "CV de una página con cabecera de acento, secciones con regla de color y macro \\entrada para experiencia/formación. Autocontenido: compila en cualquier LaTeX sin descargar paquetes.",
+  "kind": "starter",
+  "engine": "any",
+  "license": "MIT"
+}

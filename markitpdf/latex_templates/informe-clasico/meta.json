@@ -1,0 +1,9 @@
+{
+  "name": "Informe clásico",
+  "description": "El LaTeX de toda la vida: tipografía serif, blanco y negro, sin portada. Sobrio y directo, ideal para documentos internos y borradores formales.",
+  "kind": "wrapper",
+  "engine": "any",
+  "license": "MIT",
+  "toc_default": false,
+  "accent": "000000"
+}

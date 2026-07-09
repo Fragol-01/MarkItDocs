@@ -1,0 +1,10 @@
+{
+  "name": "Apuntes / Libro",
+  "description": "Documento largo con capítulos: cada título H1 del Markdown abre un capítulo nuevo. Portada centrada, índice y cabecera con el capítulo actual. Para apuntes, manuales y libros.",
+  "kind": "wrapper",
+  "engine": "any",
+  "license": "MIT",
+  "toc_default": true,
+  "book_headings": true,
+  "accent": "7B2D3B"
+}

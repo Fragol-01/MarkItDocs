@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html as html_escape
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -15,6 +16,23 @@ import markdown as markdown_lib
 from .browser import find_browser
 
 THEMES_DIR = Path(__file__).parent / "themes"
+
+#: Temas creados por el usuario (Diseñador visual); mismo formato .css + .json.
+USER_THEMES_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "MarkItDocs" / "themes"
+
+
+def _theme_dirs() -> list[Path]:
+    return [d for d in (THEMES_DIR, USER_THEMES_DIR) if d.exists()]
+
+
+def _find_theme_file(theme_name: str, suffixes: tuple[str, ...]) -> Path | None:
+    """Primer archivo del tema en built-in y luego carpeta de usuario."""
+    for directory in _theme_dirs():
+        for suffix in suffixes:
+            candidate = directory / f"{theme_name}{suffix}"
+            if candidate.exists():
+                return candidate
+    return None
 
 RENDER_TIMEOUT_SECONDS = 60
 
@@ -43,8 +61,8 @@ _H1_MD_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 
 
 def available_themes() -> list[str]:
-    """Devuelve los temas disponibles ordenados (los que tienen un .css asociado)."""
-    return sorted(p.stem for p in THEMES_DIR.glob("*.css"))
+    """Temas disponibles (built-in + creados por el usuario), ordenados."""
+    return sorted({p.stem for d in _theme_dirs() for p in d.glob("*.css")})
 
 
 @dataclass(frozen=True)
@@ -129,27 +147,26 @@ def get_theme_metadata(theme_name: str) -> ThemeMetadata:
 
 def _load_theme_metadata(theme_name: str) -> ThemeMetadata:
     """Carga la metadata opcional de un tema (.json o .yaml al lado del .css)."""
-    for suffix in (".json", ".yaml", ".yml"):
-        meta_path = THEMES_DIR / f"{theme_name}{suffix}"
-        if meta_path.exists():
-            try:
-                if suffix == ".json":
-                    data = json.loads(meta_path.read_text(encoding="utf-8"))
-                else:
-                    data = _read_yaml(meta_path)
-            except Exception as exc:  # pragma: no cover - malformed theme
-                return ThemeMetadata(name=theme_name, description=f"(metadata inválida: {exc})")
-            return ThemeMetadata(
-                name=data.get("name", theme_name),
-                description=data.get("description", ""),
-                version=str(data.get("version", "1.0.0")),
-                css_file=data.get("css", f"{theme_name}.css"),
-                fonts=data.get("fonts", {}) or {},
-                colors=data.get("colors", {}) or {},
-                sizes=data.get("sizes", {}) or {},
-                page=data.get("page", {}) or {},
-            )
-    return ThemeMetadata(name=theme_name)
+    meta_path = _find_theme_file(theme_name, (".json", ".yaml", ".yml"))
+    if meta_path is None:
+        return ThemeMetadata(name=theme_name)
+    try:
+        if meta_path.suffix == ".json":
+            data = json.loads(meta_path.read_text(encoding="utf-8"))
+        else:
+            data = _read_yaml(meta_path)
+    except Exception as exc:  # pragma: no cover - malformed theme
+        return ThemeMetadata(name=theme_name, description=f"(metadata inválida: {exc})")
+    return ThemeMetadata(
+        name=data.get("name", theme_name),
+        description=data.get("description", ""),
+        version=str(data.get("version", "1.0.0")),
+        css_file=data.get("css", f"{theme_name}.css"),
+        fonts=data.get("fonts", {}) or {},
+        colors=data.get("colors", {}) or {},
+        sizes=data.get("sizes", {}) or {},
+        page=data.get("page", {}) or {},
+    )
 
 
 def _read_yaml(path: Path) -> dict:
@@ -164,12 +181,12 @@ def _read_yaml(path: Path) -> dict:
 
 
 def _load_theme_css(theme: str) -> str:
-    themes = available_themes()
-    if theme not in themes:
+    css_path = _find_theme_file(theme, (".css",))
+    if css_path is None:
         raise ValueError(
-            f"Tema '{theme}' no existe. Temas disponibles: {', '.join(themes)}"
+            f"Tema '{theme}' no existe. Temas disponibles: {', '.join(available_themes())}"
         )
-    return (THEMES_DIR / f"{theme}.css").read_text(encoding="utf-8")
+    return css_path.read_text(encoding="utf-8")
 
 
 # Una fila de tabla pipe y su separador de cabecera (| :--- | --- |)
@@ -248,10 +265,21 @@ def _merge_bodies(bodies: list[str], page_break_class: str = "__mip_pagebreak__"
 class MarkdownToPdfConverter:
     """Convierte uno o varios archivos Markdown/HTML a PDF renderizando con Chromium headless."""
 
-    def __init__(self, theme: str = "professional", browser_path: str | None = None) -> None:
-        self.theme = theme
-        self.css = _load_theme_css(theme)
-        self.metadata = _load_theme_metadata(theme)
+    def __init__(
+        self,
+        theme: str = "professional",
+        browser_path: str | None = None,
+        custom_css: str | None = None,
+        custom_metadata: "ThemeMetadata | None" = None,
+    ) -> None:
+        """Con ``custom_css`` se salta la carga de tema (usado por el Diseñador)."""
+        self.theme = theme if custom_css is None else "(personalizado)"
+        if custom_css is None:
+            self.css = _load_theme_css(theme)
+            self.metadata = _load_theme_metadata(theme)
+        else:
+            self.css = custom_css
+            self.metadata = custom_metadata or ThemeMetadata.empty()
         self.browser_path = browser_path or find_browser()
 
     def convert(self, source_path: Path, output_path: Path | None = None) -> ConversionResult:

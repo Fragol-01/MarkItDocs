@@ -1,0 +1,7 @@
+{
+  "name": "Factura",
+  "description": "Factura de servicios con cabecera de marca, datos fiscales, tabla de conceptos booktabs y bloque de totales (subtotal, impuestos, total). Lista para editar importes.",
+  "kind": "starter",
+  "engine": "any",
+  "license": "MIT"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Contrato de servicios",
+  "description": "Modelo orientativo de contrato de desarrollo web: partes, objeto, alcance, plazos, pagos, propiedad intelectual, confidencialidad, garantía y firmas. Revísalo con un profesional legal.",
+  "kind": "starter",
+  "engine": "any",
+  "license": "MIT"
+}
