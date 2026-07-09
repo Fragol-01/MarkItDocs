@@ -20,3 +20,8 @@ INDICE.md
 PROCESO_EMPAQUETADO.md
 RESUMEN_FINAL.txt
 icon_base64.txt
+
+# Contexto interno del asistente (no publicar)
+CLAUDE.md
+graphify-out/
+Modelo_Negocio/
