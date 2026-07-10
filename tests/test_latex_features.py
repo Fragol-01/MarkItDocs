@@ -53,11 +53,12 @@ def test_md2tex_core_elements():
         "Pegado:\n| A | B |\n| --- | ---: |\n| 1 | 2 |\n\n"
         "```python\nprint(1)\n```\n\n> cita\n\n![f](img.png)\n",
         base_dir=Path(r"C:\base"),
+        math=True,
     )
     assert "\\section{Uno}" in body and "\\subsection{Dos}" in body
     assert "\\textbf{b}" in body and "\\textit{i}" in body
     assert "\\&" in body and "\\%" in body and "\\#tag" in body
-    assert "$x^2$" in body  # la matemática pasa intacta
+    assert "$x^2$" in body  # con math=True la fórmula pasa intacta
     assert "\\begin{longtable}" in body and "\\toprule" in body  # tabla sin línea previa
     assert "language=Python" in body
     assert "displayquote" in body
@@ -73,6 +74,55 @@ def test_md2tex_escapes_backslash():
 def test_book_headings_mode():
     body = markdown_to_latex_body("# Cap\n", book_headings=True)
     assert "\\chapter{Cap}" in body
+
+
+def _assert_percent_escaped(body: str) -> None:
+    for line in body.splitlines():
+        idx = 0
+        while True:
+            idx = line.find("%", idx)
+            if idx == -1:
+                break
+            assert idx > 0 and line[idx - 1] == "\\", f"% sin escapar: {line!r}"
+            idx += 1
+
+
+def test_currency_and_percent_do_not_break_latex():
+    """Regresión del bug real: docs financieros con $ y % rompían \\textit."""
+    md = (
+        "*Escenario Base: Ingreso anual proyectado = $ 3,760 con +15% y CV $237.*\n\n"
+        "* 50% Landing Pages (Precio $350, CV $237) -> MCu = $113\n"
+        "* 30% Web Corporativa (Precio $800, CV $487) -> MCu = $313\n\n"
+        "Con `codigo` dentro de *cursiva con `x = 1` incluida*.\n"
+    )
+    body = markdown_to_latex_body(md)
+    assert body.count("{") == body.count("}"), "llaves desbalanceadas"
+    _assert_percent_escaped(body)
+    assert "\\$" in body            # la moneda queda escapada
+    assert "\\verb" not in body     # inline code ya no usa \verb
+    assert "\\texttt{" in body
+
+
+def test_math_is_opt_in():
+    with_math = markdown_to_latex_body("La fórmula $x^2 + 1$ queda.\n", math=True)
+    assert "$x^2 + 1$" in with_math
+    without = markdown_to_latex_body("La fórmula $x^2 + 1$ queda.\n")
+    assert "$x^2 + 1$" not in without and "\\$" in without
+
+
+def test_currency_document_compiles():
+    if not _latex_available():
+        print("SKIP: sin motor LaTeX")
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        md = Path(tmp) / "moneda.md"
+        md.write_text(
+            "# Finanzas\n\n*Base: $ 3,760 con +15% y CV $237.*\n\n"
+            "* 50% Landing ($350, CV $237) -> $113\n",
+            encoding="utf-8",
+        )
+        pdf = convert_markdown_via_latex([md], Path(tmp) / "m.pdf", template="apuntes-libro")
+        assert pdf.exists() and pdf.stat().st_size > 1000
 
 
 def test_templates_catalog_and_instantiation():
@@ -166,6 +216,9 @@ if __name__ == "__main__":
         test_md2tex_core_elements,
         test_md2tex_escapes_backslash,
         test_book_headings_mode,
+        test_currency_and_percent_do_not_break_latex,
+        test_math_is_opt_in,
+        test_currency_document_compiles,
         test_templates_catalog_and_instantiation,
         test_wrapper_placeholders_resolve,
         test_starter_instantiation_copies_file,

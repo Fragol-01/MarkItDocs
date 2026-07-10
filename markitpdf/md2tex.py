@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import mistletoe
+from mistletoe.base_renderer import BaseRenderer
 from mistletoe.latex_renderer import LaTeXRenderer
 
 from .converter import _normalize_table_blank_lines
@@ -46,10 +47,30 @@ def escape_latex(text: str) -> str:
 
 
 class SpanishLatexRenderer(LaTeXRenderer):
-    """LaTeXRenderer de mistletoe afinado para las plantillas de MarkItDocs."""
+    """LaTeXRenderer de mistletoe afinado para las plantillas de MarkItDocs.
 
-    def __init__(self, base_dir: Path | None = None, book_headings: bool = False, **kwargs):
-        super().__init__(**kwargs)
+    ``math=False`` (por defecto) NO registra el token matemático ``$...$`` de
+    mistletoe: en documentos de negocio los ``$`` son moneda y el passthrough
+    crudo de "matemáticas" accidentales (p. ej. ``$350, CV $237`` con un ``%``
+    cerca) rompe la compilación. Con ``math=True`` (plantillas científicas)
+    las fórmulas pasan, saneadas.
+    """
+
+    def __init__(
+        self,
+        base_dir: Path | None = None,
+        book_headings: bool = False,
+        math: bool = False,
+        **kwargs,
+    ):
+        if math:
+            super().__init__(**kwargs)
+        else:
+            # Inicializar SIN los tokens extra de latex_token (Math):
+            # los $ quedan como texto normal y se escapan a \$.
+            self.packages = {}
+            self.verb_delimiters = ""  # no usamos \verb (ver render_inline_code)
+            BaseRenderer.__init__(self)
         self.base_dir = base_dir
         self.headings = _BOOK_HEADINGS if book_headings else _ARTICLE_HEADINGS
 
@@ -57,6 +78,20 @@ class SpanishLatexRenderer(LaTeXRenderer):
         if not escape:
             return token.content
         return escape_latex(token.content)
+
+    def render_math(self, token):
+        # Solo llega con math=True. Sanear: % y # jamás son matemáticas
+        # válidas (un % crudo comenta el resto de la línea y descuadra las
+        # llaves de \textit/\textbf); llaves desbalanceadas → texto escapado.
+        content = token.content
+        if content.count("{") != content.count("}"):
+            return escape_latex(content)
+        return content.replace("%", r"\%").replace("#", r"\#")
+
+    def render_inline_code(self, token):
+        # \verb es ilegal dentro de argumentos (\textit{... \verb!..! ...});
+        # \texttt con escape completo funciona en cualquier posición.
+        return "\\texttt{" + escape_latex(token.children[0].content) + "}"
 
     def render_heading(self, token):
         cmd = self.headings.get(token.level, "paragraph")
@@ -114,8 +149,11 @@ def markdown_to_latex_body(
     md_text: str,
     base_dir: Path | None = None,
     book_headings: bool = False,
+    math: bool = False,
 ) -> str:
     """Convierte texto Markdown al cuerpo LaTeX equivalente."""
     normalized = _normalize_table_blank_lines(md_text)
-    with SpanishLatexRenderer(base_dir=base_dir, book_headings=book_headings) as renderer:
+    with SpanishLatexRenderer(
+        base_dir=base_dir, book_headings=book_headings, math=math
+    ) as renderer:
         return renderer.render(mistletoe.Document(normalized))

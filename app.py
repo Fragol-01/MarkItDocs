@@ -736,8 +736,10 @@ class App:
         self._preview_after_id = None
         if not self.selected_files:
             self._preview_images = []
+            self._preview_ctk_image = None
+            # image="" (no None): None deja la imagen anterior pegada en CTkLabel
             self.preview_image_label.configure(
-                image=None, text="La vista previa aparecerá aquí\ncuando agregues un archivo."
+                image="", text="La vista previa aparecerá aquí\ncuando agregues un archivo."
             )
             self.preview_page_label.configure(text="– / –")
             self.preview_status.configure(text="")
@@ -1044,6 +1046,43 @@ def _selftest() -> int:
 
         check("md->pdf (temas HTML)", html_pdf)
         check("md->pdf (via LaTeX)", latex_pdf)
+
+        def latex_currency():
+            m = Path(tmp) / "moneda.md"
+            m.write_text(
+                "# Finanzas\n\n*Base: $ 3,760 con +15% y CV $237.*\n\n"
+                "* 50% Landing ($350, CV $237) -> $113\n",
+                encoding="utf-8",
+            )
+            out = convert_markdown_via_latex([m], Path(tmp) / "moneda.pdf",
+                                             template="informe-clasico")
+            return f"{out.stat().st_size} bytes"
+
+        def chromium_parallel():
+            import threading as _th
+            results: dict = {}
+
+            def render(i: int) -> None:
+                m = Path(tmp) / f"par{i}.md"
+                m.write_text(f"# Documento paralelo {i}\n\nContenido.\n", encoding="utf-8")
+                try:
+                    MarkdownToPdfConverter(theme="professional").convert(
+                        m, Path(tmp) / f"par{i}.pdf"
+                    )
+                    results[i] = (Path(tmp) / f"par{i}.pdf").stat().st_size
+                except Exception as exc:  # noqa: BLE001
+                    results[i] = f"ERR {exc}"
+
+            threads = [_th.Thread(target=render, args=(i,)) for i in (1, 2)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            assert all(isinstance(v, int) and v > 0 for v in results.values()), results
+            return f"2 PDFs simultaneos OK {sorted(results.values())}"
+
+        check("md->pdf (LaTeX con moneda y %)", latex_currency)
+        check("chromium x2 en paralelo (preview+convertir)", chromium_parallel)
         check("pdf->imagenes (preview)", preview_images)
 
     def designer_pieces():

@@ -110,8 +110,12 @@ def convert_markdown_via_latex(
         raise ValueError("Se requiere al menos un archivo .md")
 
     book = bool(meta.get("book_headings"))
+    math = bool(meta.get("math"))  # solo plantillas científicas activan $...$
     bodies = [
-        markdown_to_latex_body(p.read_text(encoding="utf-8"), base_dir=p.parent, book_headings=book)
+        markdown_to_latex_body(
+            p.read_text(encoding="utf-8"), base_dir=p.parent,
+            book_headings=book, math=math,
+        )
         for p in resolved
     ]
     body = "\n\\clearpage\n".join(bodies)

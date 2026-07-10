@@ -6,6 +6,7 @@ import html as html_escape
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -346,36 +347,53 @@ class MarkdownToPdfConverter:
 
     def _render_pdf(self, html_path: Path, output_path: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        command = [
-            self.browser_path,
-            "--headless=new",
-            "--disable-gpu",
-            "--no-pdf-header-footer",
-            f"--print-to-pdf={output_path}",
-            "--no-sandbox",
-            str(html_path),
-        ]
-        try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=RENDER_TIMEOUT_SECONDS,
-                # En el .exe sin consola el stdin heredado es inválido y puede
-                # colgar al hijo; DEVNULL + sin ventana lo hace determinista.
-                stdin=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise TimeoutError(
-                f"El renderizado de PDF excedió {RENDER_TIMEOUT_SECONDS}s. "
-                "El documento puede ser demasiado grande o el navegador quedó bloqueado."
-            ) from exc
+        with tempfile.TemporaryDirectory(
+            prefix="markitdocs_edge_", ignore_cleanup_errors=True
+        ) as tmp:
+            tmp_dir = Path(tmp)
+            tmp_pdf = tmp_dir / "out.pdf"
+            command = [
+                self.browser_path,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-first-run",
+                "--disable-extensions",
+                # Perfil propio por render: si Edge ya está abierto (o hay dos
+                # renders a la vez, p. ej. vista previa + convertir), compartir
+                # el perfil hace que la instancia delegue y salga SIN imprimir.
+                f"--user-data-dir={tmp_dir / 'profile'}",
+                "--no-pdf-header-footer",
+                f"--print-to-pdf={tmp_pdf}",
+                "--no-sandbox",
+                str(html_path),
+            ]
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    timeout=RENDER_TIMEOUT_SECONDS,
+                    # En el .exe sin consola el stdin heredado es inválido y
+                    # puede colgar al hijo; DEVNULL + sin ventana = determinista.
+                    stdin=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise TimeoutError(
+                    f"El renderizado de PDF excedió {RENDER_TIMEOUT_SECONDS}s. "
+                    "El documento puede ser demasiado grande o el navegador quedó bloqueado."
+                ) from exc
 
-        if not output_path.exists() or output_path.stat().st_size == 0:
-            raise RuntimeError(
-                f"Chromium no generó el PDF. stderr: {result.stderr.strip()[:500]}"
-            )
+            if not tmp_pdf.exists() or tmp_pdf.stat().st_size == 0:
+                raise RuntimeError(
+                    f"Chromium no generó el PDF (código {result.returncode}). "
+                    f"stderr: {result.stderr.strip()[:500]}"
+                )
+            # Publicación atómica: nadie puede abrir un PDF a medio escribir.
+            try:
+                os.replace(tmp_pdf, output_path)
+            except OSError:
+                shutil.move(str(tmp_pdf), str(output_path))
 
 
 def convert_markdown_to_pdf(
