@@ -996,7 +996,73 @@ class App:
         self.root.mainloop()
 
 
+def _selftest() -> int:
+    """Autodiagnóstico del ejecutable: `MarkItDocs.exe --selftest`.
+
+    Escribe selftest_log.txt junto al exe con el resultado de cada subsistema,
+    para diagnosticar problemas que solo aparecen en el binario congelado.
+    """
+    import tempfile as _tf
+    import traceback
+
+    base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+    log_path = base / "selftest_log.txt"
+    lines: list[str] = [
+        f"MarkItDocs selftest — frozen={getattr(sys, 'frozen', False)} python={sys.version}",
+    ]
+
+    def check(name, fn):
+        try:
+            result = fn()
+            lines.append(f"OK    {name}: {result}")
+        except Exception:
+            lines.append(f"FALLO {name}:\n{traceback.format_exc()}")
+
+    check("temas", lambda: f"{len(available_themes())} temas")
+    check("plantillas latex", lambda: f"{len(available_latex_templates())} plantillas")
+    check("navegador", find_browser)
+    check("motor latex", lambda: find_latex_engine().path)
+
+    with _tf.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        md = Path(tmp) / "t.md"
+        md.write_text("# Selftest\n\n| A |\n| --- |\n| 1 |\n", encoding="utf-8")
+
+        def html_pdf():
+            out = MarkdownToPdfConverter(theme="professional").convert(md, Path(tmp) / "h.pdf")
+            return f"{out.output_path.stat().st_size} bytes"
+
+        def latex_pdf():
+            out = convert_markdown_via_latex([md], Path(tmp) / "l.pdf", template="informe-clasico")
+            return f"{out.stat().st_size} bytes"
+
+        def preview_images():
+            pdf = Path(tmp) / "h.pdf"
+            if not pdf.exists():
+                MarkdownToPdfConverter(theme="professional").convert(md, pdf)
+            images = pdf_to_images(pdf, scale=1.0, max_pages=1)
+            return f"{len(images)} imagen(es) {images[0].size}"
+
+        check("md->pdf (temas HTML)", html_pdf)
+        check("md->pdf (via LaTeX)", latex_pdf)
+        check("pdf->imagenes (preview)", preview_images)
+
+    def designer_pieces():
+        from markitpdf.themebuilder import DEFAULT_MODEL, build_css
+        css = build_css(DEFAULT_MODEL)
+        import designer as _d  # el módulo del Diseñador importa dentro del exe
+        return f"css {len(css)} chars, DesignerWindow={_d.DesignerWindow.__name__}"
+
+    check("disenador (css+modulo)", designer_pieces)
+
+    report = "\n".join(lines)
+    log_path.write_text(report, encoding="utf-8")
+    print(report)
+    return 0 if "FALLO" not in report else 1
+
+
 def main() -> None:
+    if "--selftest" in sys.argv:
+        raise SystemExit(_selftest())
     App().run()
 
 

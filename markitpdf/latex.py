@@ -159,6 +159,10 @@ def compile_tex(
                     errors="replace",
                     cwd=tex_path.parent,
                     timeout=COMPILE_TIMEOUT_SECONDS,
+                    # En el .exe sin consola el stdin heredado es inválido y puede
+                    # colgar a xelatex/MiKTeX; DEVNULL + sin ventana lo evita.
+                    stdin=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except subprocess.TimeoutExpired as exc:
                 raise LatexCompileError(

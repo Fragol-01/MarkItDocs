@@ -361,6 +361,10 @@ class MarkdownToPdfConverter:
                 capture_output=True,
                 text=True,
                 timeout=RENDER_TIMEOUT_SECONDS,
+                # En el .exe sin consola el stdin heredado es inválido y puede
+                # colgar al hijo; DEVNULL + sin ventana lo hace determinista.
+                stdin=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError(
